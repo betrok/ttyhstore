@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	store_root string
+	store_root, prefix_root string
 	special_dirs = []string{"versions", "libraries", "assets"}
 	
 	versions_url = "http://s3.amazonaws.com/Minecraft.Download/versions/"
@@ -33,6 +33,7 @@ var (
 	custom_last = ""
 	ignore = ""
 	clone = ""
+	vers_prefix = ""
 	
 	verbose, localCheck bool
 )
@@ -67,11 +68,24 @@ func main() {
 		`)
 
 	flag.StringVar(&clone, "clone", "", `
-	--clone=<version1>[,<version2>][...]
-	Load version[s] from official repo.
-	`)
+		--clone=<version1>[,<version2>][...]
+		Load version[s] from official repo.
+		`)
+	
+	flag.StringVar(&vers_prefix, "prefix", "default", `
+		Set version prefix for work. Uservull for cursom clients trees.
+		All prefixes have common libs & assets directorys.
+		`)
 	
 	flag.Parse()
+	
+	if(len(vers_prefix) == 0) {
+		prefix_root = store_root
+		log.Println("No prefix defined, working in store_root")
+	} else {
+		prefix_root = store_root + "/" + vers_prefix
+		log.Printf("Working in prefix \"%s\"\n\n", vers_prefix)
+	}
 	
 	if(localCheck) {
 		for _, cli := range(flag.Args()) {
@@ -95,11 +109,11 @@ func main() {
 
 func cloneCli(cli string) error {
 	_, err := getFile(versions_url+ cli + "/" + cli + ".jar",
-		store_root + "/" + cli + "/" + cli + ".jar")
+		prefix_root + "/" + cli + "/" + cli + ".jar")
 	if(err != nil) { return err }
 	
 	_, err = getFile(versions_url + cli + "/" + cli + ".json",
-		store_root + "/" + cli + "/" + cli + ".json")
+		prefix_root + "/" + cli + "/" + cli + ".json")
 	if(err != nil) { return err }
 	
 	_, err = checkCli(cli)
@@ -108,9 +122,13 @@ func cloneCli(cli string) error {
 
 func checkAll() {
 	new_vers := newVersions()
-	dir, err := ioutil.ReadDir(store_root)
+	
+	if err := os.MkdirAll(prefix_root + "/versions", os.ModeDir | 0755); err != nil {
+		log.Fatal(err)
+	}
+	dir, err := ioutil.ReadDir(prefix_root)
 	if(err != nil) {
-		log.Fatal("Cann't read store_root directory", err)
+		log.Fatal("Cann't read prefix_root directory", err)
 	}
 	
 	for _, fi := range dir {
@@ -143,10 +161,7 @@ func checkAll() {
 	log.Println("Generated version.json:")
 	log.Println(string(data))
 	
-	if err = os.MkdirAll(store_root + "/versions", os.ModeDir | 0755); err != nil {
-		log.Fatal(err)
-	}
-	fd, err := os.Create(store_root + "/versions/versions.json")
+	fd, err := os.Create(prefix_root + "/versions/versions.json")
 	if(err != nil) { log.Fatal("Create versions.json failed:", err) }
 	fd.Write(data)
 	fd.Close()
@@ -156,7 +171,7 @@ func checkCli(version string) (vinfo *VInfoFull, err error) {
 	vinfo = newVInfoFull()
 	log.Printf("Checking cli \"%s\"...\n", version)
 	var fd *os.File
-	if fd, err = os.Open(store_root + "/" + version + "/" + version + ".json"); err == nil {
+	if fd, err = os.Open(prefix_root + "/" + version + "/" + version + ".json"); err == nil {
 		decoder := json.NewDecoder(fd)
 		err = decoder.Decode(vinfo)
 		fd.Close()
@@ -176,11 +191,11 @@ func checkCli(version string) (vinfo *VInfoFull, err error) {
 	}
 	log.Printf("%v.json: OK", version)
 	
-	if _, err = os.Stat(store_root + "/" + version + "/" + version + ".jar"); err != nil {
+	if _, err = os.Stat(prefix_root + "/" + version + "/" + version + ".jar"); err != nil {
 		return
 	}
 	log.Printf("%v.jar: OK", version)
-	if _, err = os.Stat(store_root + "/" + version + "/" + version + "-tweaker.jar"); err != nil {
+	if _, err = os.Stat(prefix_root + "/" + version + "/" + version + "-tweaker.jar"); err != nil {
 		log.Printf("W: Tweaker not found for \"%s\"", version)
 	}
 	
