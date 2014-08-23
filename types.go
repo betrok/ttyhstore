@@ -69,10 +69,11 @@ type Asset struct {
 var help_msg = `Usage: %s [command] [options] [args]
 
 Commads:
-
-	check <prefix1>/<version1> [<prefix2>/<version2>] [...]
+	
+	check [<prefix1>/]<version1>[,[<prefix2>/]<version2>][...]
 		Check whatever specified clients are consistent,
 		if possible download missing files from official repos.
+		If prefix not provided will search in default.
 	
 	collect
 		Check all client versions,
@@ -92,9 +93,8 @@ Options:
 	--root=<path>
 		Overwrite storage root, default may be set by $TTYH_STORE env variable.
 		
-	--ignore=[<prefix1>/]<version1>[,[<prefix2>/]<version2>][...]
+	--ignore=<prefix1>/<version1> [<prefix2>/<version2>] [...]
 		Don't check specified versions while collect.
-		If prefix not provided will search in default.
 		
 	--prefix=<prefix>
 		Set for default clone. Predefined is "default".
