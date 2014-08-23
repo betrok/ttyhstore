@@ -39,7 +39,13 @@ var (
 	clone = ""
 	prefix = ""
 	
-	verbose, localCheck bool
+	verbose, localCheck, cleanup bool
+	
+	required = struct {
+		libs, indexes, assets map[string] bool
+	}{ map[string]bool{}, map[string]bool{}, map[string]bool{} }
+	
+	invalids bool
 )
 
 func main() {
@@ -48,8 +54,19 @@ func main() {
 	action, args := configure()
 	
 	switch action {
+		case "cleanup":
+			cleanup = true
+			fallthrough
+		
 		case "collect":
 			collectAll()
+			if(cleanup) {
+				if(invalids) {
+					log.Println("Cleanup abroted in case of invalid cli")
+				} else {
+					clean()
+				}
+			}
 			
 		case "check":
 			for _, cli := range(args) {
@@ -66,7 +83,7 @@ func main() {
 						_, err = checkCli(store_root + part[0] + "/", part[1])
 						
 					default:
-						log.Fatalf("Too maty slashes in \"%s\"", cli)
+						log.Fatalf("Too many slashes in \"%s\"", cli)
 				}
 				if(err != nil) {
 					log.Printf("Client \"%s\" check failed: %v\n", cli, err)
@@ -96,6 +113,7 @@ func configure() (action string, args []string) {
 	
 	flag.BoolVar(&help, "help", false, "generated help sucks, overwrite it")
 	flag.BoolVar(&verbose, "v", false, "")
+	flag.BoolVar(&cleanup, "cleanup", false, "")
 	flag.StringVar(&store_root, "root", store_root, "")
 	flag.StringVar(&last, "last", "", "")
 	flag.StringVar(&ignore, "ignore", "", "")
@@ -184,6 +202,7 @@ func collectPrefix(prefix_root string) {
 				new_vers.latestTime[vinfo.Type] = vinfo.Release
 			}
 		} else {
+			invalids = true
 			log.Printf("Client \"%s\" check failed: %v\n", fi.Name(), err)
 		}
 		log.Println()
@@ -203,6 +222,7 @@ func collectPrefix(prefix_root string) {
 	if(err != nil) { log.Fatal("Create versions.json failed:", err) }
 	fd.Write(data)
 	fd.Close()
+	log.Printf("\nDone in prefix \"%s\"\n\n", prefix)
 }
 
 func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
@@ -253,13 +273,6 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	return
 }
 
-func inSlice(val string, sli []string) bool {
-	for _, t := range(sli) {
-		if(val == t) { return true }
-	}
-	return false
-}
-
 func checkLibs(libInfo []*LibInfo) error {
 	log.Println("Checking libs...")
 	path_list := make([]string, 0, 10)
@@ -305,6 +318,9 @@ func checkLibs(libInfo []*LibInfo) error {
 	}
 	for _, path := range(path_list) {
 		if err := getLib(path); err != nil { return err }
+		if(cleanup && !invalids) {
+			required.libs[filepath.Base(path)] = true
+		}
 	}
 	return nil
 }
@@ -395,6 +411,9 @@ func parceIndex(version string) (*AssetsList, error) {
 	list := newAssetsList()
 	decoder := json.NewDecoder(fd)
 	err = decoder.Decode(list)
+	if(cleanup && !invalids) {
+		required.indexes[version + ".json"] = true
+	}
 	
 	fd.Close()
 	return list, err
@@ -409,7 +428,7 @@ func checkAssets(version string, official bool) (err error) {
 	if(err != nil) {
 		if(os.IsNotExist(err) && official) {
 			log.Printf("W: Assets index \"%s\" not found, downloading official version", version)
-			_, err = getFile(url["index"] + version + ".json", store_root + "assets/indexes/" + version + ".json")
+			_, err = getFile(url["indexes"] + version + ".json", store_root + "assets/indexes/" + version + ".json")
 			if(err != nil) { return }
 			list, err = parceIndex(version)
 			if(err != nil) { return }
@@ -420,6 +439,9 @@ func checkAssets(version string, official bool) (err error) {
 	for name, a := range(list.Data) {
 		if(len(a.Hash) != 40 || a.Size <= 0) {
 			return fmt.Errorf("Assets \"%s\"(%s) size or hash defined incorrect", name, a.Hash)
+		}
+		if(cleanup && !invalids) {
+			required.assets[a.Hash] = true
 		}
 		local_path := a.Hash[:2] + "/" + a.Hash
 		fi, err := os.Stat(store_root + "assets/objects/" + local_path)
@@ -442,6 +464,68 @@ func checkAssets(version string, official bool) (err error) {
 	}
 	
 	return
+}
+
+//TODO remove empty dirs
+func clean() {
+	log.Println("Cleaning up...\n")
+	indexes_root := store_root + "assets/indexes/"
+	dir, err := ioutil.ReadDir(indexes_root)
+	if(err != nil) {
+		log.Fatal("Cann't read assets indexes directory", err)
+	}
+	for _, fi := range dir {
+		if(fi.IsDir() || required.indexes[fi.Name()]) { continue }
+		err = os.Remove(indexes_root + fi.Name())
+		if(err != nil) { log.Fatal("Cleanup failed:", err) }
+		if(verbose) {
+			log.Printf("Index \"%s\" deleted", fi.Name())
+		}
+	}
+	
+	libs_root := store_root + "libraries/"
+	filepath.Walk(libs_root, func(path string, info os.FileInfo, err error)(error) {
+			if(err != nil) { log.Println("While walking over libraries:", err) }
+			if(info.IsDir()) {
+				return nil
+			} else if(!required.libs[strings.TrimSuffix(filepath.Base(path), ".sha1")]) {
+				err = os.Remove(path)
+				if(err != nil) {
+					log.Fatal(err)
+				} else if(verbose) {
+					log.Printf("In libs: \"%s\" deleted", info.Name())
+				}
+			}
+			return nil
+		})
+	
+	filepath.Walk(store_root + "assets/objects/", func(path string, info os.FileInfo, err error)(error) {
+		if(err != nil) { log.Println("While walking over libraries:", err) }
+		if(info.IsDir()) {
+			return nil
+		} else if(!required.assets[filepath.Base(path)]) {
+			err = os.Remove(path)
+			if(err != nil) {
+				log.Fatal(err)
+			} else if(verbose) {
+				log.Printf("In assets: \"%s\" deleted", info.Name())
+			}
+		}
+		return nil
+	})
+	
+	
+	log.Println("Cleanup finished")
+}
+
+func rmEmptyDirs(path string) (err error) {
+	flist, err := ioutil.ReadDir(path)
+	for len(flist) == 0 && err == nil {
+		err = os.Remove(path)
+		path = filepath.Dir(path)
+		flist, _ = ioutil.ReadDir(path)
+	}
+	return err
 }
 
 func getFile(url, dest_path string) (int64, error) {
@@ -489,4 +573,11 @@ func fileHash(path string) ([]byte, error) {
 	h := sha1.New()
 	io.Copy(h, fd)
 	return h.Sum(nil), nil
+}
+
+func inSlice(val string, sli []string) bool {
+	for _, t := range(sli) {
+		if(val == t) { return true }
+	}
+	return false
 }

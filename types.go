@@ -66,7 +66,7 @@ type Asset struct {
 	Size	int64	`json:"size"`
 }
 
-var help_msg = `Usage: %s [command] [options] [args]
+var help_msg = `Usage: %s [options] [command] [args]
 
 Commads:
 	
@@ -80,10 +80,13 @@ Commads:
 		geneate new versions.json in all prefixes.
 		
 	clone <off_version1> [<off_version2>] [...]
-		Clone clients from official repos in default prefix.
+		Clone clients from official repos to default prefix.
 		
 	help
 		Show this message.
+		
+	cleanup
+		Alias to "collect --cleanup"
 		
 Options:
 	
@@ -97,10 +100,15 @@ Options:
 		Don't check specified versions while collect.
 		
 	--prefix=<prefix>
-		Set for default clone. Predefined is "default".
+		Set default prefix for clone or check. Predefined is "default".
 		
 	--last=<prefix1>/<type1>:<version1>[,<prefix2>/<type2>:<version2>][...]
 		Overwrite latest versions in versions.json manualy.
 		Default choise based on releaseTime in <version>.json
+		
+	--cleanup
+		After collect delete all libraries and assets,
+		that not required by any client.
+		Cleanup will abroting if any of clis is inconsistent.
 `
 
