@@ -40,7 +40,7 @@ type VInfoFull struct {
 	MainClass		string		`json:"mainClass"`
 }
 func newVInfoFull() *VInfoFull {
-	return &VInfoFull{Libs: make([]*LibInfo, 0)}
+	return &VInfoFull{ Libs: make([]*LibInfo, 0, 10) }
 }
 
 type LibInfo struct {
@@ -58,12 +58,24 @@ type AssetsList struct {
 	Data map[string] Asset	`json:"objects"`
 }
 func newAssetsList() *AssetsList {
-	return &AssetsList{make(map[string] Asset)}
+	return &AssetsList{ make(map[string] Asset) }
 }
 
 type Asset struct {
 	Hash	string	`json:"hash"`
 	Size	int64	`json:"size"`
+}
+
+type PrefixInfo struct {
+	About	string	`json:"about"`
+	Type	string	`json:"type"`
+}
+
+type PrefixList struct {
+	Prefixes map[string]PrefixInfo	`json:"prefixes"`
+}
+func newPrefixList() *PrefixList {
+	return &PrefixList{ make(map[string]PrefixInfo) }
 }
 
 var help_msg = `Usage: %s [options] [command] [args]

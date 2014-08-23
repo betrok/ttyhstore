@@ -128,6 +128,10 @@ func configure() (action string, args []string) {
 	
 	if(help) { return "help", flag.Args() }
 	
+	if(inSlice(prefix, special_dirs) || len(prefix) == 0) {
+		log.Fatal("Passed prefix belongs to special directorys")
+	}
+	
 	for name, link := range(url) {
 		if(link[len(link) - 1] != '/') {
 			url[name] = link + "/"
@@ -168,15 +172,28 @@ func collectAll() {
 	if(err != nil) {
 		log.Fatal("Cann't read store_root directory", err)
 	}
+	plist := newPrefixList()
 	for _, fi := range dir {
 		if(!fi.IsDir() || inSlice(fi.Name(), special_dirs)) { continue }
 		
-		collectPrefix(store_root + fi.Name() + "/")
+		pinfo := collectPrefix(store_root + fi.Name() + "/")
+		if(pinfo.Type != "hide") {
+			plist.Prefixes[fi.Name()] = pinfo
+		}
 	}
+	
+	data, _ := json.MarshalIndent(plist, "", "  ")
+	log.Println("Generated prefixes.json:")
+	log.Println(string(data))
+	
+	fd, err := os.Create(store_root + "prefixes.json")
+	if(err != nil) { log.Fatal("Create prefixes.json failed:", err) }
+	fd.Write(data)
+	fd.Close()
 }
 
-func collectPrefix(prefix_root string) {
-	new_vers := newVersions()
+func collectPrefix(prefix_root string) PrefixInfo {
+	var err error
 	prefix := filepath.Base(prefix_root)
 	
 	log.Printf("\nJoining prefix \"%s\"\n\n", prefix)
@@ -184,6 +201,21 @@ func collectPrefix(prefix_root string) {
 	if err := os.MkdirAll(prefix_root + "versions", os.ModeDir | 0755); err != nil {
 		log.Fatal(err)
 	}
+	
+	var pinfo PrefixInfo
+	var fd *os.File
+	if fd, err = os.Open(prefix_root + "prefix.json"); err == nil {
+		decoder := json.NewDecoder(fd)
+		err = decoder.Decode(&pinfo)
+		fd.Close()
+	}
+	if(err != nil) { 
+		log.Println("W: prefix.json read failed, use generic info\n")
+		pinfo.Type = "public"
+	}
+	
+	new_vers := newVersions()
+	
 	dir, err := ioutil.ReadDir(prefix_root)
 	if(err != nil) {
 		log.Fatal("Cann't read prefix root directory", err)
@@ -218,11 +250,13 @@ func collectPrefix(prefix_root string) {
 	log.Println("Generated version.json:")
 	log.Println(string(data))
 	
-	fd, err := os.Create(prefix_root + "versions/versions.json")
+	fd, err = os.Create(prefix_root + "versions/versions.json")
 	if(err != nil) { log.Fatal("Create versions.json failed:", err) }
 	fd.Write(data)
 	fd.Close()
 	log.Printf("\nDone in prefix \"%s\"\n\n", prefix)
+	
+	return pinfo
 }
 
 func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
