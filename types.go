@@ -36,6 +36,7 @@ type VInfoFull struct {
 	LVersion		int			`json:"minimumLauncherVersion"`
 	Assets			string		`json:"assets"`
 	CustomAssets	bool		`json:"customAssets"`
+	CustomFiles		bool		`json:"customFiles"`
 	Libs			[]*LibInfo	`json:"libraries"`
 	MainClass		string		`json:"mainClass"`
 }
@@ -54,14 +55,14 @@ type Rule struct {
 	Os		map[string]string	`json:"os"`
 }
 
-type AssetsList struct {
-	Data map[string] Asset	`json:"objects"`
+type ObjectList struct {
+	Data map[string] Object	`json:"objects"`
 }
-func newAssetsList() *AssetsList {
-	return &AssetsList{ make(map[string] Asset) }
+func newObjectList() *ObjectList {
+	return &ObjectList{ make(map[string] Object) }
 }
 
-type Asset struct {
+type Object struct {
 	Hash	string	`json:"hash"`
 	Size	int64	`json:"size"`
 }

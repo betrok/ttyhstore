@@ -283,11 +283,13 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	}
 	log.Printf("%v.json: OK", version)
 	
-	if _, err = os.Stat(prefix_root + version + "/" + version + ".jar"); err != nil {
+	vers_root := prefix_root + version + "/"
+	
+	if _, err = os.Stat(vers_root + version + ".jar"); err != nil {
 		return
 	}
 	log.Printf("%v.jar: OK", version)
-	if _, err = os.Stat(prefix_root + version + "/" + version + "-tweaker.jar"); err != nil {
+	if _, err = os.Stat(vers_root + version + "-tweaker.jar"); err != nil {
 		log.Printf("W: Tweaker not found for \"%s\"", version)
 	}
 	
@@ -302,8 +304,15 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	} else {
 		log.Printf("W: No assets defined in \"%s\"\n", version)
 	}
+	if(err != nil) { return }
 	
-	if(err == nil) { log.Printf("Cli \"%s\" seems to be suitable", version) }
+	if(vinfo.CustomFiles) {
+		err = checkFiles(vers_root)
+		if(err != nil) { return }
+		log.Println("Files: OK")
+	}
+	
+	log.Printf("Cli \"%s\" seems to be suitable", version)
 	return
 }
 
@@ -438,19 +447,37 @@ func readHashfile(full_path string) ([]byte, error) {
 	return hash, err
 }
 
-func parceIndex(version string) (*AssetsList, error) {
-	fd, err := os.Open(store_root + "assets/indexes/" + version + ".json")
+func parceIndex(path string) (*ObjectList, error) {
+	fd, err := os.Open(path)
 	if(err != nil) { return nil, err }
 	
-	list := newAssetsList()
+	list := newObjectList()
 	decoder := json.NewDecoder(fd)
 	err = decoder.Decode(list)
-	if(cleanup && !invalids) {
-		required.indexes[version + ".json"] = true
-	}
 	
 	fd.Close()
 	return list, err
+}
+
+func checkFiles(vers_root string) (error) {
+	log.Printf("Checking files for \"%s\"...\n", filepath.Base(vers_root))
+	list, err := parceIndex(vers_root + "files.json")
+	if(err != nil) { return err }
+	
+	//TODO check hash
+	for name, a := range(list.Data) {
+		fi, err := os.Stat(vers_root + "files/" + name)
+		if(err == nil) { 
+			if(fi.Size() == a.Size) {
+				if(verbose) {
+					log.Printf("File \"%s\" checked successfully\n", name)
+				}
+				continue
+			}
+			return fmt.Errorf("File \"%s\" size mismatch with definition\n", name, a.Hash)
+		}
+	}
+	return nil
 }
 
 func checkAssets(version string, official bool) (err error) {
@@ -458,7 +485,7 @@ func checkAssets(version string, official bool) (err error) {
 	if err = os.MkdirAll(store_root + "assets/indexes/", os.ModeDir | 0755); err != nil { return }
 	if err = os.MkdirAll(store_root + "assets/objects/", os.ModeDir | 0755); err != nil { return }
 	
-	list, err := parceIndex(version)
+	list, err := parceIndex(store_root + "assets/indexes/" + version + ".json")
 	if(err != nil) {
 		if(os.IsNotExist(err) && official) {
 			log.Printf("W: Assets index \"%s\" not found, downloading official version", version)
@@ -467,6 +494,10 @@ func checkAssets(version string, official bool) (err error) {
 			list, err = parceIndex(version)
 			if(err != nil) { return }
 		} else { return }
+	}
+	
+	if(cleanup && !invalids) {
+		required.indexes[version + ".json"] = true
 	}
 	
 	//TODO check hash
