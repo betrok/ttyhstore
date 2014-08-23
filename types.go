@@ -66,3 +66,41 @@ type Asset struct {
 	Size	int64	`json:"size"`
 }
 
+var help_msg = `Usage: %s [command] [options] [args]
+
+Commads:
+
+	check <prefix1>/<version1> [<prefix2>/<version2>] [...]
+		Check whatever specified clients are consistent,
+		if possible download missing files from official repos.
+	
+	collect
+		Check all client versions,
+		geneate new versions.json in all prefixes.
+		
+	clone <off_version1> [<off_version2>] [...]
+		Clone clients from official repos in default prefix.
+		
+	help
+		Show this message.
+		
+Options:
+	
+	-v
+		Be more verbose.
+		
+	--root=<path>
+		Overwrite storage root, default may be set by $TTYH_STORE env variable.
+		
+	--ignore=[<prefix1>/]<version1>[,[<prefix2>/]<version2>][...]
+		Don't check specified versions while collect.
+		If prefix not provided will search in default.
+		
+	--prefix=<prefix>
+		Set for default clone. Predefined is "default".
+		
+	--last=<prefix1>/<type1>:<version1>[,<prefix2>/<type2>:<version2>][...]
+		Overwrite latest versions in versions.json manualy.
+		Default choise based on releaseTime in <version>.json
+`
+
