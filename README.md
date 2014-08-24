@@ -12,7 +12,7 @@ Data store model mostly follows official(see [wiki.vg](http://wiki.vg/Game_Files
 Relative to storage root:
 *   **/prefixes.json**
     
-    Contains list of prefixes generated from **/<prefix>/prefix.json**. If prefix have type *"hide"*, it will not append hire.
+    Contains list of prefixes generated from **/&lt;prefix>/prefix.json**. If prefix have type *"hide"*, it will not append hire.
     ```
     {
         "prefixes": {
@@ -25,7 +25,7 @@ Relative to storage root:
     }
     ```
 
-*   **/<prefix>/prefix.json**
+*   **/&lt;prefix>/prefix.json**
     ```
     {
         "about": "<about>",
@@ -35,30 +35,30 @@ Relative to storage root:
     
     If this file is not presented defaults are `{"about" = "", "type" = "public"}`.
     
-*   **/<prefix>/versions/versions.json**
+*   **/&lt;prefix>/versions/versions.json**
 
    Similar to http://s3.amazonaws.com/Minecraft.Download/versions/versions.json for current prefix.
    
-*   **/<prefix>/<version>/<version>.jar**
+*   **/&lt;prefix>/&lt;version>/&lt;version>.jar**
 
-*   **/<prefix>/<version>/<version>.json**
+*   **/&lt;prefix>/&lt;version>/&lt;version>.json**
     
     May contains optional non-standard fields:
     - `"jarHash": "<sha1 of <version.jar>>"`
     - `"customFiles": <bool>` see bellow
     - `"customAssets": <bool>` do not try to load official asserts index if it's missing 
 
-*   **/<prefix>/<version>/files.json**
+*   **/&lt;prefix>/&lt;version>/files.json**
     
-    If *"customAssets"* in **<version>.json** is *true*, **ttyhstore** will check custom files, defined hire.
+    If *"customAssets"* in **&lt;version>.json** is *true*, **ttyhstore** will check custom files, defined hire.
     
     **files.json** format is fully similar to assets indexes.
 
-*   **/<prefix>/<version>/files/**
+*   **/&lt;prefix>/&lt;version>/files/**
 
     Contains custom fails, defined in **files.json**.
     
-    For file with relative path *<path>* place will be just **/<prefix>/<version>/files/<path>**.
+    For file with relative path *&lt;path>* place will be just **/&lt;prefix>/&lt;version>/files/&lt;path>**.
     
 *   **/libraries/**
 
@@ -66,9 +66,9 @@ Relative to storage root:
 
 *   **/assets/indexes/**
 
-    Contain asserts indexes(**<asserts version>.jar**), similar to https://s3.amazonaws.com/Minecraft.Download/indexes/.
+    Contain asserts indexes(**&lt;asserts version>.jar**), similar to https://s3.amazonaws.com/Minecraft.Download/indexes/.
     
-*   **/assets/objects/<first 2 hex letters of hash>/<whole hash>**
+*   **/assets/objects/&lt;first 2 hex letters of hash>/&lt;whole hash>**
 
     Assets files.
     
@@ -92,15 +92,15 @@ Done, now you have your own minecraft update server with official 1.7.4 and 1.7.
 
 #### Custom client
 
-Create **/<prefix>/<your version>**, place there **<version>.json** and **<version>.jar** files.
+Create **/&lt;prefix>/&lt;your version>**, place there **&lt;version>.json** and **&lt;version>.jar** files.
 
-For libraries, that aren't presented in official repo, place **<lib>.jar** and **<lib hash>.jar.sha1** to **/libraries/** follows minecraft path policy.
+For libraries, that aren't presented in official repo, place **&lt;lib>.jar** and **&lt;lib hash>.jar.sha1** to **/libraries/** follows minecraft path policy.
 
-If your build need some specific files, append `"customAssets": true` to **<versions>.json**. Generate file index **files.json**, place it in **/<prefix>/<your version>**, files to **/<prefix>/<your version>/files/**.
+If your build need some specific files, append `"customAssets": true` to **&lt;versions>.json**. Generate file index **files.json**, place it in **/&lt;prefix>/&lt;your version>**, files to **/&lt;prefix>/&lt;your version>/files/**.
 
 To make sure that everything is correct, run
 ```
-ttyhstore check *<prefix>/<your version>*
+ttyhstore check *&lt;prefix>/&lt;your version>*
 ```
 Then regenerate **versions.json** with
 ```
