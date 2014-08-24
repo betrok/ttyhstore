@@ -56,7 +56,7 @@ Relative to storage root:
 
 *   **/&lt;prefix>/&lt;version>/files/**
 
-    Contains custom fails, defined in **files.json**.
+    Contains custom files, defined in **files.json**.
     
     For file with relative path *&lt;path>* place will be just **/&lt;prefix>/&lt;version>/files/&lt;path>**.
     
@@ -77,7 +77,7 @@ Libraries and assets are shared between all prefixes and versions.
 
 ### Usage
 
-Firs of all you need set **TTYH_STORE** env variable. It's define where will located storage root. You may also use *--root* option, but it's less comfortable.
+First of all you need set **TTYH_STORE** env variable. It's define where will located storage root. You may also use *--root* option, but it's less comfortable.
 
 #### Minimal example
 Clone passed versions from official repository to default prefix:
@@ -94,7 +94,7 @@ Done, now you have your own minecraft update server with official 1.7.4 and 1.7.
 
 Create **/&lt;prefix>/&lt;your version>/** directory, place there **&lt;version>.json** and **&lt;version>.jar** files.
 
-For libraries, that aren't presented in official repo, place **&lt;lib>.jar** and **&lt;lib hash>.jar.sha1** to **/libraries/** follows minecraft path policy.
+For libraries, that aren't presented in official repo, place **&lt;lib name>.jar** and **&lt;lib name>.jar.sha1** hash file to **/libraries/** follows minecraft path policy.
 
 If your build need some specific files, append `"customFiles": true` to **&lt;versions>.json**. Generate index **files.json**, place it in **/&lt;prefix>/&lt;your version>**, files in **/&lt;prefix>/&lt;your version>/files/**.
 
@@ -103,7 +103,7 @@ If your build need some specific files, append `"customFiles": true` to **&lt;ve
 ttyhstore genindex <path to files root> <output file>
 ```
 
-*genindex* use absolute or relative to working directories paths, storage root means noting for it. 
+*genindex* use absolute or relative to working directory paths, storage root means noting for it. 
 
 To make sure that everything is correct and download missing asserts and libraries, run
 ```

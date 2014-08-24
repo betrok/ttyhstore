@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	store_root, prefix_root string
+	store_root string
 	special_dirs = []string{"libraries", "assets"}
 	
 	url = map[string] string {
@@ -39,7 +39,7 @@ var (
 	clone = ""
 	prefix = ""
 	
-	verbose, localCheck, cleanup bool
+	verbose, cleanup bool
 	
 	checked = struct {
 		libs, indexes, assets map[string] bool
@@ -50,6 +50,7 @@ var (
 
 func main() {
 	log.SetFlags(0)
+	log.SetOutput(os.Stdout)
 	
 	action, args := configure()
 	
@@ -297,9 +298,31 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	
 	vers_root := prefix_root + version + "/"
 	
-	if _, err = os.Stat(vers_root + version + ".jar"); err != nil {
-		return
+	switch len(vinfo.JarHash) {
+		case 0:
+			if _, err = os.Stat(vers_root + version + ".jar"); err != nil {
+				return
+			}
+			
+		case 40:
+			hash, err := hex.DecodeString(vinfo.JarHash)
+			if(err != nil) {
+				return nil, fmt.Errorf("Invalid hash \"%s\" provided for .jar file", vinfo.JarHash)
+			}
+			fhash, err := fileHash(vers_root + version + ".jar")
+			if(err != nil) {
+				return nil, fmt.Errorf("Hash calculate for .jar failed: %v", err)
+			}
+			if(!bytes.Equal(hash, fhash)) {
+				return nil, fmt.Errorf(".jar hash sums mismatched: %s != %s.",
+					hex.EncodeToString(hash), hex.EncodeToString(fhash))
+			}
+			
+			
+		default:
+			return nil, fmt.Errorf("Invalid hash \"%s\" provided for .jar file", vinfo.JarHash)
 	}
+	
 	log.Printf("%v.jar: OK", version)
 	if _, err = os.Stat(vers_root + version + "-tweaker.jar"); err != nil {
 		log.Printf("W: Tweaker not found for \"%s\"", version)
