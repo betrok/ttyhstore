@@ -44,7 +44,7 @@ Relative to storage root:
 *   **/&lt;prefix>/&lt;version>/&lt;version>.json**
     
     May contains optional non-standard fields:
-    - `"jarHash": "<sha1 of <version.jar>>"`
+    - `"jarHash": "<sha1 of <version>.jar>"`
     - `"customFiles": <bool>` see bellow
     - `"customAssets": <bool>` do not try to load official asserts index if it's missing 
 
@@ -92,15 +92,15 @@ Done, now you have your own minecraft update server with official 1.7.4 and 1.7.
 
 #### Custom client
 
-Create **/&lt;prefix>/&lt;your version>**, place there **&lt;version>.json** and **&lt;version>.jar** files.
+Create **/&lt;prefix>/&lt;your version>/** directory, place there **&lt;version>.json** and **&lt;version>.jar** files.
 
 For libraries, that aren't presented in official repo, place **&lt;lib>.jar** and **&lt;lib hash>.jar.sha1** to **/libraries/** follows minecraft path policy.
 
 If your build need some specific files, append `"customAssets": true` to **&lt;versions>.json**. Generate file index **files.json**, place it in **/&lt;prefix>/&lt;your version>**, files to **/&lt;prefix>/&lt;your version>/files/**.
 
-To make sure that everything is correct, run
+To make sure that everything is correct and download missing asserts and libraries, run
 ```
-ttyhstore check *&lt;prefix>/&lt;your version>*
+ttyhstore check <prefix>/<your version>
 ```
 Then regenerate **versions.json** with
 ```
