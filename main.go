@@ -134,7 +134,8 @@ func configure() (action string, args []string) {
 	flag.Parse()
 	
 	if(len(store_root) == 0) { 
-		log.Fatal("Srote root not defined.")
+		log.Println("Srote root not defined.\n")
+		help = true
 	}
 	
 	if(help) { return "help", flag.Args() }

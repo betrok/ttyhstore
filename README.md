@@ -103,7 +103,7 @@ If your build need some specific files, append `"customAssets": true` to **&lt;v
 ttyhstore genindex <path to files root> <output file>
 ```
 
-*genindex* use absolute or relative to working directories, storage root means noting for it. 
+*genindex* use absolute or relative to working directories paths, storage root means noting for it. 
 
 To make sure that everything is correct and download missing asserts and libraries, run
 ```
