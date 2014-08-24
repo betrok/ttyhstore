@@ -196,7 +196,7 @@ func collectPrefix(prefix_root string) PrefixInfo {
 	var err error
 	prefix := filepath.Base(prefix_root)
 	
-	log.Printf("\Joining prefix \"%s\"\n\n", prefix)
+	log.Printf("\nJoining prefix \"%s\"\n\n", prefix)
 	
 	if err := os.MkdirAll(prefix_root + "versions", os.ModeDir | 0755); err != nil {
 		log.Fatal(err)
@@ -222,7 +222,7 @@ func collectPrefix(prefix_root string) PrefixInfo {
 	}
 	
 	for _, fi := range dir {
-		if(!fi.IsDir() || inSlice(fi.Name(), special_dirs) ||
+		if(!fi.IsDir() || fi.Name() == "versions" ||
 			ignore_list[prefix + "/" + fi.Name()]) { continue }
 		
 		vinfo, err := checkCli(prefix_root, fi.Name())
