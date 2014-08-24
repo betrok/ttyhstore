@@ -41,7 +41,7 @@ var (
 	
 	verbose, localCheck, cleanup bool
 	
-	required = struct {
+	checked = struct {
 		libs, indexes, assets map[string] bool
 	}{ map[string]bool{}, map[string]bool{}, map[string]bool{} }
 	
@@ -360,10 +360,14 @@ func checkLibs(libInfo []*LibInfo) error {
 		}
 	}
 	for _, path := range(path_list) {
-		if err := getLib(path); err != nil { return err }
-		if(cleanup && !invalids) {
-			required.libs[filepath.Base(path)] = true
+		if(checked.libs[filepath.Base(path)]) {
+			if(verbose) {
+				log.Printf("Lib \"%s\" already checked\n", filepath.Base(path))
+			}
+			continue
 		}
+		if err := getLib(path); err != nil { return err }
+		checked.libs[filepath.Base(path)] = true
 	}
 	return nil
 }
@@ -482,6 +486,14 @@ func checkFiles(vers_root string) (error) {
 
 func checkAssets(version string, official bool) (err error) {
 	log.Printf("Checking assets \"%s\"...\n", version)
+	
+	if(checked.indexes[version + ".json"]) {
+		if(verbose) {
+			log.Printf("Index \"%s\" already checked\n", version + ".json")
+		}
+		return nil
+	}
+	
 	if err = os.MkdirAll(store_root + "assets/indexes/", os.ModeDir | 0755); err != nil { return }
 	if err = os.MkdirAll(store_root + "assets/objects/", os.ModeDir | 0755); err != nil { return }
 	
@@ -491,30 +503,31 @@ func checkAssets(version string, official bool) (err error) {
 			log.Printf("W: Assets index \"%s\" not found, downloading official version", version)
 			_, err = getFile(url["indexes"] + version + ".json", store_root + "assets/indexes/" + version + ".json")
 			if(err != nil) { return }
-			list, err = parceIndex(version)
+			list, err = parceIndex(version + ".json")
 			if(err != nil) { return }
 		} else { return }
 	}
 	
-	if(cleanup && !invalids) {
-		required.indexes[version + ".json"] = true
-	}
-	
 	//TODO check hash
 	for name, a := range(list.Data) {
+		if(checked.assets[a.Hash]) {
+			if(verbose) {
+				log.Printf("Already checked: \"%s\"(%s)\n", name, a.Hash)
+			}
+			continue
+		}
+		
 		if(len(a.Hash) != 40 || a.Size <= 0) {
 			return fmt.Errorf("Assets \"%s\"(%s) size or hash defined incorrect", name, a.Hash)
-		}
-		if(cleanup && !invalids) {
-			required.assets[a.Hash] = true
 		}
 		local_path := a.Hash[:2] + "/" + a.Hash
 		fi, err := os.Stat(store_root + "assets/objects/" + local_path)
 		if(err == nil) { 
 			if(fi.Size() == a.Size) {
 				if(verbose) {
-					log.Printf("Asset \"%s\"(%s) already exist\n", name, a.Hash)
+					log.Printf("Exist: \"%s\"(%s)\n", name, a.Hash)
 				}
+				checked.assets[a.Hash] = true
 				continue
 			}
 			log.Printf("Assets \"%s\"(%s) local file size mismatch with definition, regeting\n", name, a.Hash)
@@ -526,8 +539,10 @@ func checkAssets(version string, official bool) (err error) {
 		if(size != a.Size) {
 			return fmt.Errorf("Downloaded asset \"%s\"(%s) size mismatch with definition", name, a.Hash)
 		}
+		checked.assets[a.Hash] = true
 	}
 	
+	checked.indexes[version + ".json"] = true
 	return
 }
 
@@ -540,7 +555,7 @@ func clean() {
 		log.Fatal("Cann't read assets indexes directory", err)
 	}
 	for _, fi := range dir {
-		if(fi.IsDir() || required.indexes[fi.Name()]) { continue }
+		if(fi.IsDir() || checked.indexes[fi.Name()]) { continue }
 		err = os.Remove(indexes_root + fi.Name())
 		if(err != nil) { log.Fatal("Cleanup failed:", err) }
 		if(verbose) {
@@ -553,7 +568,7 @@ func clean() {
 			if(err != nil) { log.Println("While walking over libraries:", err) }
 			if(info.IsDir()) {
 				return nil
-			} else if(!required.libs[strings.TrimSuffix(filepath.Base(path), ".sha1")]) {
+			} else if(!checked.libs[strings.TrimSuffix(filepath.Base(path), ".sha1")]) {
 				err = os.Remove(path)
 				if(err != nil) {
 					log.Fatal(err)
@@ -568,7 +583,7 @@ func clean() {
 		if(err != nil) { log.Println("While walking over libraries:", err) }
 		if(info.IsDir()) {
 			return nil
-		} else if(!required.assets[filepath.Base(path)]) {
+		} else if(!checked.assets[filepath.Base(path)]) {
 			err = os.Remove(path)
 			if(err != nil) {
 				log.Fatal(err)
