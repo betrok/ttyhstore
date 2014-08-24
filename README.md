@@ -66,7 +66,7 @@ Relative to storage root:
 
 *   **/assets/indexes/**
 
-    Contain asserts indexes(**&lt;asserts version>.jar**), similar to https://s3.amazonaws.com/Minecraft.Download/indexes/.
+    Contain asserts indexes(**&lt;asserts version>.json**), similar to https://s3.amazonaws.com/Minecraft.Download/indexes/.
     
 *   **/assets/objects/&lt;first 2 hex letters of hash>/&lt;whole hash>**
 
