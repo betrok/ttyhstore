@@ -20,7 +20,7 @@ import (
 
 var (
 	store_root, prefix_root string
-	special_dirs = []string{"versions", "libraries", "assets"}
+	special_dirs = []string{"libraries", "assets"}
 	
 	url = map[string] string {
 		"versions":	"http://s3.amazonaws.com/Minecraft.Download/versions/",
@@ -99,7 +99,18 @@ func main() {
 				}
 			}
 			
-		case "help":
+		case "genindex":
+			if(len(args) != 2) { log.Fatal("genindex expect two arguments") }
+			list, err := genIndex(args[0])
+			if(err != nil) { log.Fatal("genindex failed:", err) }
+			data, _ := json.MarshalIndent(list, "", "  ")
+			fd, err := os.Create(args[1])
+			if(err != nil) { log.Fatal("Create index file failed:", err) }
+			fd.Write(data)
+			fd.Close()
+			
+			
+		default:
 			flag.Usage()
 	}
 }
@@ -503,7 +514,7 @@ func checkAssets(version string, official bool) (err error) {
 			log.Printf("W: Assets index \"%s\" not found, downloading official version", version)
 			_, err = getFile(url["indexes"] + version + ".json", store_root + "assets/indexes/" + version + ".json")
 			if(err != nil) { return }
-			list, err = parceIndex(version + ".json")
+			list, err = parceIndex(store_root + "assets/indexes/" + version + ".json")
 			if(err != nil) { return }
 		} else { return }
 	}
@@ -606,6 +617,29 @@ func rmEmptyDirs(path string) (err error) {
 		flist, _ = ioutil.ReadDir(path)
 	}
 	return err
+}
+
+func genIndex(root string) (*ObjectList, error) {
+	if(root[len(root) - 1] != '/') {
+		root += "/"
+	}
+	list := newObjectList()
+	
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if(err != nil) {
+			log.Println("While walking:", err)
+			return err
+		}
+		if(info.IsDir()) { return nil }
+		
+		hash, err := fileHash(path)
+		if(err != nil) { return err }
+		list.Data[strings.TrimPrefix(path, root)] = Object{ hex.EncodeToString(hash), info.Size() }
+		
+		return nil
+	})
+	
+	return list, err
 }
 
 func getFile(url, dest_path string) (int64, error) {

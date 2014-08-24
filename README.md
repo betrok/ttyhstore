@@ -96,13 +96,20 @@ Create **/&lt;prefix>/&lt;your version>/** directory, place there **&lt;version>
 
 For libraries, that aren't presented in official repo, place **&lt;lib>.jar** and **&lt;lib hash>.jar.sha1** to **/libraries/** follows minecraft path policy.
 
-If your build need some specific files, append `"customAssets": true` to **&lt;versions>.json**. Generate file index **files.json**, place it in **/&lt;prefix>/&lt;your version>**, files to **/&lt;prefix>/&lt;your version>/files/**.
+If your build need some specific files, append `"customAssets": true` to **&lt;versions>.json**. Generate index **files.json**, place it in **/&lt;prefix>/&lt;your version>**, files in **/&lt;prefix>/&lt;your version>/files/**.
+
+**files.json** may be generated with
+```
+ttyhstore genindex <path to files root> <output file>
+```
+
+*genindex* use absolute or relative to working directories, storage root means noting for it. 
 
 To make sure that everything is correct and download missing asserts and libraries, run
 ```
 ttyhstore check <prefix>/<your version>
 ```
-Then regenerate **versions.json** with
+Then regenerate **versions.json**
 ```
 ttyhstore collect
 ```

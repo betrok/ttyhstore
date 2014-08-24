@@ -102,6 +102,11 @@ Commads:
 	cleanup
 		Alias to "collect --cleanup"
 		
+	genindex <files_root> <output_file>
+		Create index for files in passed directory.
+		This command use absolute or relative to working dir paths,
+		storage root means noting for it. 
+		
 Options:
 	
 	-v
