@@ -32,6 +32,7 @@ func (p VersSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 type VInfoFull struct {
 	VInfoMin
+	JarHash			string		`json:"jarHash"`
 	Arguments		string		`json:"minecraftArguments"`
 	LVersion		int			`json:"minimumLauncherVersion"`
 	Assets			string		`json:"assets"`
@@ -116,12 +117,12 @@ Options:
 		Set default prefix for clone or check. Predefined is "default".
 		
 	--last=<prefix1>/<type1>:<version1>[,<prefix2>/<type2>:<version2>][...]
-		Overwrite latest versions in versions.json manualy.
-		Default choise based on releaseTime in <version>.json
+		Overwrite latest versions in versions.json manually.
+		Default chaise based on releaseTime in <version>.json
 		
 	--cleanup
 		After collect delete all libraries and assets,
 		that not required by any client.
-		Cleanup will abroting if any of clis is inconsistent.
+		Cleanup will aborting if any of clis is inconsistent.
 `
 

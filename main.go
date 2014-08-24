@@ -62,7 +62,7 @@ func main() {
 			collectAll()
 			if(cleanup) {
 				if(invalids) {
-					log.Println("Cleanup abroted in case of invalid cli")
+					log.Println("Cleanup aborted in case of invalid cli")
 				} else {
 					clean()
 				}
@@ -129,7 +129,7 @@ func configure() (action string, args []string) {
 	if(help) { return "help", flag.Args() }
 	
 	if(inSlice(prefix, special_dirs) || len(prefix) == 0) {
-		log.Fatal("Passed prefix belongs to special directorys")
+		log.Fatal("Passed prefix belongs to special directories")
 	}
 	
 	for name, link := range(url) {
@@ -170,7 +170,7 @@ func cloneCli(prefix_root, cli string) error {
 func collectAll() {
 	dir, err := ioutil.ReadDir(store_root)
 	if(err != nil) {
-		log.Fatal("Cann't read store_root directory", err)
+		log.Fatal("Can't read store_root directory", err)
 	}
 	plist := newPrefixList()
 	for _, fi := range dir {
@@ -196,7 +196,7 @@ func collectPrefix(prefix_root string) PrefixInfo {
 	var err error
 	prefix := filepath.Base(prefix_root)
 	
-	log.Printf("\nJoining prefix \"%s\"\n\n", prefix)
+	log.Printf("\Joining prefix \"%s\"\n\n", prefix)
 	
 	if err := os.MkdirAll(prefix_root + "versions", os.ModeDir | 0755); err != nil {
 		log.Fatal(err)
@@ -218,7 +218,7 @@ func collectPrefix(prefix_root string) PrefixInfo {
 	
 	dir, err := ioutil.ReadDir(prefix_root)
 	if(err != nil) {
-		log.Fatal("Cann't read prefix root directory", err)
+		log.Fatal("Can't read prefix root directory", err)
 	}
 	
 	for _, fi := range dir {
@@ -393,7 +393,7 @@ func genNeeders(rules []Rule) []string {
 				}
 				
 			default:
-				log.Printf("Cann't handle unknown rule: %+v", rule)
+				log.Printf("Can't handle unknown rule: %+v", rule)
 		}
 	}
 	return ns
@@ -403,7 +403,7 @@ func getLib(path string) error {
 	hash, err := readHashfile(store_root + "libraries/" + path + ".sha1")
 	if(err != nil) {
 		if(!os.IsNotExist(err)) {
-			log.Printf("While reading hashfile for \"%s\": %v", filepath.Base(path), err)
+			log.Printf("While reading hash file for \"%s\": %v", filepath.Base(path), err)
 		}
 		_, err = getFile(url["libs"] + path + ".sha1", store_root + "libraries/" + path + ".sha1")
 		if(err != nil) { return err }
@@ -422,18 +422,18 @@ func getLib(path string) error {
 	}
 	
 	if(err == nil) {
-		log.Printf("Hashsums mismatched to \"%s\": %s != %s. Regetting...",
+		log.Printf("Hash sums mismatched to \"%s\": %s != %s. Regetting...",
 		filepath.Base(path), hex.EncodeToString(hash), hex.EncodeToString(fhash))
 	}
 	_, err = getFile(url["libs"] + path, store_root + "libraries/" + path)
 	if(err != nil) { return err }
 	
 	fhash, err = fileHash(store_root + "libraries/" + path)
-	if(err != nil) { return fmt.Errorf("Unable to calculate hashsum: %v", err) }
+	if(err != nil) { return fmt.Errorf("Unable to calculate hash sum: %v", err) }
 	
 	if(bytes.Equal(hash, fhash)) { return nil }
 	
-	return fmt.Errorf("Hashsums mismatched to \"%s\": %s != %s. Regetting change noting.",
+	return fmt.Errorf("Hash sums mismatched to \"%s\": %s != %s. Regetting change noting.",
 		filepath.Base(path), hex.EncodeToString(hash), hex.EncodeToString(fhash))
 }
 
@@ -552,7 +552,7 @@ func clean() {
 	indexes_root := store_root + "assets/indexes/"
 	dir, err := ioutil.ReadDir(indexes_root)
 	if(err != nil) {
-		log.Fatal("Cann't read assets indexes directory", err)
+		log.Fatal("Can't read assets indexes directory", err)
 	}
 	for _, fi := range dir {
 		if(fi.IsDir() || checked.indexes[fi.Name()]) { continue }
