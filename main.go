@@ -305,19 +305,10 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 			}
 			
 		case 40:
-			hash, err := hex.DecodeString(vinfo.JarHash)
+			err := checkHash(vers_root + version + ".jar", vinfo.JarHash)
 			if(err != nil) {
-				return nil, fmt.Errorf("Invalid hash \"%s\" provided for .jar file", vinfo.JarHash)
+				return nil, err
 			}
-			fhash, err := fileHash(vers_root + version + ".jar")
-			if(err != nil) {
-				return nil, fmt.Errorf("Hash calculate for .jar failed: %v", err)
-			}
-			if(!bytes.Equal(hash, fhash)) {
-				return nil, fmt.Errorf(".jar hash sums mismatched: %s != %s.",
-					hex.EncodeToString(hash), hex.EncodeToString(fhash))
-			}
-			
 			
 		default:
 			return nil, fmt.Errorf("Invalid hash \"%s\" provided for .jar file", vinfo.JarHash)
@@ -452,7 +443,7 @@ func getLib(path string) error {
 	if(err == nil && bytes.Equal(hash, fhash)) {
 		if(verbose) {
 			log.Printf("Lib \"%s\" already exist\n", filepath.Base(path))
-		}
+		} 
 		return nil
 	}
 	
@@ -503,17 +494,11 @@ func checkFiles(vers_root string) (error) {
 	list, err := parceIndex(vers_root + "files.json")
 	if(err != nil) { return err }
 	
-	//TODO check hash
 	for name, a := range(list.Data) {
-		fi, err := os.Stat(vers_root + "files/" + name)
-		if(err == nil) { 
-			if(fi.Size() == a.Size) {
-				if(verbose) {
-					log.Printf("File \"%s\" checked successfully\n", name)
-				}
-				continue
-			}
-			return fmt.Errorf("File \"%s\" size mismatch with definition\n", name, a.Hash)
+		err = checkHash(vers_root + "files/" + name, a.Hash)
+		if(err != nil) { return nil }
+		if(verbose) {
+			log.Printf("File \"%s\" checked successfully\n", name)
 		}
 	}
 	return nil
@@ -543,7 +528,6 @@ func checkAssets(version string, official bool) (err error) {
 		} else { return }
 	}
 	
-	//TODO check hash
 	for name, a := range(list.Data) {
 		if(checked.assets[a.Hash]) {
 			if(verbose) {
@@ -556,24 +540,24 @@ func checkAssets(version string, official bool) (err error) {
 			return fmt.Errorf("Assets \"%s\"(%s) size or hash defined incorrect", name, a.Hash)
 		}
 		local_path := a.Hash[:2] + "/" + a.Hash
-		fi, err := os.Stat(store_root + "assets/objects/" + local_path)
+		err := checkHash(store_root + "assets/objects/" + local_path, a.Hash)
 		if(err == nil) { 
-			if(fi.Size() == a.Size) {
-				if(verbose) {
-					log.Printf("Exist: \"%s\"(%s)\n", name, a.Hash)
-				}
-				checked.assets[a.Hash] = true
-				continue
+			if(verbose) {
+				log.Printf("Exist: \"%s\"(%s)\n", name, a.Hash)
 			}
-			log.Printf("Assets \"%s\"(%s) local file size mismatch with definition, regeting\n", name, a.Hash)
+			checked.assets[a.Hash] = true
+			continue
+		} else {
+			if(strings.HasPrefix(err.Error(), "Invalid hash")) { return err }
+			log.Printf("%v. Regetting", err)
 		}
 		
-		size, err := getFile(url["assets"] + local_path, store_root + "assets/objects/" + local_path)
+		_, err = getFile(url["assets"] + local_path, store_root + "assets/objects/" + local_path)
 		if(err != nil) { return err }
 		
-		if(size != a.Size) {
-			return fmt.Errorf("Downloaded asset \"%s\"(%s) size mismatch with definition", name, a.Hash)
-		}
+		err = checkHash(store_root + "assets/objects/" + local_path, a.Hash)
+		if(err != nil) { return err }
+		
 		checked.assets[a.Hash] = true
 	}
 	
@@ -701,6 +685,21 @@ func readableSize(in float64) string {
 	}
 	if(sit >= len(suffix)) { return "over9000" }
 	return fmt.Sprintf("%.2f %s", in, suffix[sit])
+}
+
+func checkHash(path, hash string) error {
+	dhash, err := hex.DecodeString(hash)
+	if(err != nil || len(dhash) != 20) {
+		return fmt.Errorf("Invalid hash \"%s\" provided for \"%s\"", hash, filepath.Base(path))
+	}
+	fhash, err := fileHash(path)
+	if(err != nil) {
+		return fmt.Errorf("Hash calculate for \"%s\" failed: %v", filepath.Base(path), err)
+	}
+	if(bytes.Equal(dhash, fhash)) { return nil }
+	return fmt.Errorf("Hash sums mismatched for \"%s\":\ndefined:\t %s \ncalicated:\t %s",
+					filepath.Base(path), hash, hex.EncodeToString(fhash))
+
 }
 
 func fileHash(path string) ([]byte, error) {
