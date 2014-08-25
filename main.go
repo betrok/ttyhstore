@@ -154,6 +154,17 @@ func configure() (action string, args []string) {
 		store_root += "/"
 	}
 	
+	if(len(last) != 0) {
+		for _, t := range(strings.Split(last, ",")) {
+			part := strings.Split(last, ":")
+			if(len(part) != 2) {
+				log.Printf("Invalid --last format in \"%s\"", t)
+				return "help", nil
+			}
+			custom_last[part[0]] = part[1]
+		}
+	}
+	
 	if(len(ignore) != 0) {
 		for _, item := range(strings.Split(ignore, ",")) {
 			ignore_list[item] = true
@@ -190,7 +201,7 @@ func collectAll() {
 		if(!fi.IsDir() || inSlice(fi.Name(), special_dirs)) { continue }
 		
 		pinfo := collectPrefix(store_root + fi.Name() + "/")
-		if(pinfo.Type != "hide") {
+		if(pinfo.Type != "hidden") {
 			plist.Prefixes[fi.Name()] = pinfo
 		}
 	}
@@ -255,8 +266,24 @@ func collectPrefix(prefix_root string) PrefixInfo {
 	sort.Sort(VersSlice(new_vers.Versions))
 	for t, _ := range(new_vers.Latest) {
 		custom, ok := custom_last[prefix + "/" + t]
-		//TODO do we need to check whatever custom version is valid?
-		if(ok) { new_vers.Latest[t] = custom }
+		if(ok) {
+			valid := false
+			for _, vers := range(new_vers.Versions) {
+				if(vers.Id == custom) {
+					if(vers.Type != t) {
+						log.Fatalf("In custom latest: mismatched client types for \"%s\"",
+							prefix + "/" + "t")
+					}
+					valid = true
+					break
+				}
+			}
+			if(!valid) {
+				log.Fatalf("Custom latest for \"%s\" isn't consistent cli", prefix + "/" + "t")
+			}
+			
+			new_vers.Latest[t] = custom
+		}
 	}
 	
 	data, _ := json.MarshalIndent(new_vers, "", "  ")

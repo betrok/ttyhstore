@@ -12,7 +12,7 @@ Data store model mostly follows official(see [wiki.vg](http://wiki.vg/Game_Files
 Relative to storage root:
 *   **/prefixes.json**
     
-    Contains list of prefixes generated from **/&lt;prefix>/prefix.json**. If prefix have type *"hide"*, it will not append hire.
+    Contains list of prefixes generated from **/&lt;prefix>/prefix.json**. If prefix have type *"hidden"*, it will not append hire.
     ```
     {
         "prefixes": {
