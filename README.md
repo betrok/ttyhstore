@@ -46,7 +46,7 @@ Relative to storage root:
     May contains optional non-standard fields:
     - `"jarHash": "<sha1 of <version>.jar>"`
     - `"customFiles": <bool>` see bellow
-    - `"customAssets": <bool>` do not try to load official asserts index if it's missing 
+    - `"customAssets": <bool>` do not try to load official asserts index if it's missing
 
 *   **/&lt;prefix>/&lt;version>/files.json**
     
@@ -59,6 +59,10 @@ Relative to storage root:
     Contains custom files, defined in **files.json**.
     
     For file with relative path *&lt;path>* place will be just **/&lt;prefix>/&lt;version>/files/&lt;path>**.
+    
+*   **/&lt;prefix>/&lt;version>/libs.json**
+    
+    Index file for libraries, required by client. All os and arch are included.
     
 *   **/libraries/**
 

@@ -42,8 +42,9 @@ var (
 	verbose, cleanup bool
 	
 	checked = struct {
-		libs, indexes, assets map[string] bool
-	}{ map[string]bool{}, map[string]bool{}, map[string]bool{} }
+		libs map[string] Object
+		indexes, assets map[string] bool
+	}{ map[string]Object{}, map[string]bool{}, map[string]bool{} }
 	
 	invalids bool
 )
@@ -346,8 +347,13 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 		log.Printf("W: Tweaker not found for \"%s\"", version)
 	}
 	
-	err = checkLibs(vinfo.Libs)
+	libindex, err := checkLibs(vinfo.Libs)
 	if(err != nil) { return }
+	data, _ = json.MarshalIndent(libindex, "", "  ")
+	fd, err = os.Create(vers_root + "libs.json")
+	if(err != nil) { log.Fatal("Create index file libs.json failed:", err) }
+	fd.Write(data)
+	fd.Close()
 	log.Println("Libs: OK")
 	
 	if(len(vinfo.Assets) != 0) {
@@ -369,12 +375,12 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	return
 }
 
-func checkLibs(libInfo []*LibInfo) error {
+func checkLibs(libInfo []*LibInfo) (index *ObjectList, err error) {
 	log.Println("Checking libs...")
 	path_list := make([]string, 0, 10)
 	for _, lib := range(libInfo) {
 		part := strings.Split(lib.Name, ":")
-		if(len(part) != 3) { return fmt.Errorf("Unknown lib name format \"%s\"", lib.Name) }
+		if(len(part) != 3) { return nil, fmt.Errorf("Unknown lib name format \"%s\"", lib.Name) }
 		part[0] = strings.Replace(part[0], ".", "/", -1)
 		
 		if(lib.Natives == nil) {
@@ -412,17 +418,23 @@ func checkLibs(libInfo []*LibInfo) error {
 			}
 		}
 	}
+	
+	index = newObjectList()
 	for _, path := range(path_list) {
-		if(checked.libs[filepath.Base(path)]) {
+		info, ok := checked.libs[filepath.Base(path)]
+		if(ok) {
 			if(verbose) {
 				log.Printf("Lib \"%s\" already checked\n", filepath.Base(path))
 			}
-			continue
+		} else {
+			if info, err = getLib(path); err != nil {
+				return index, err
+			}
+			checked.libs[filepath.Base(path)] = info
 		}
-		if err := getLib(path); err != nil { return err }
-		checked.libs[filepath.Base(path)] = true
+		index.Data[path] = info
 	}
-	return nil
+	return index, nil
 }
 
 func genNeeders(rules []Rule) []string {
@@ -452,56 +464,56 @@ func genNeeders(rules []Rule) []string {
 	return ns
 }
 
-func getLib(path string) error {
-	hash, err := readHashfile(store_root + "libraries/" + path + ".sha1")
+func getLib(path string) (obj Object, err error) {
+	obj.Hash, err = readHashfile(store_root + "libraries/" + path + ".sha1")
 	if(err != nil) {
 		if(!os.IsNotExist(err)) {
 			log.Printf("While reading hash file for \"%s\": %v", filepath.Base(path), err)
 		}
 		_, err = getFile(url["libs"] + path + ".sha1", store_root + "libraries/" + path + ".sha1")
-		if(err != nil) { return err }
-		hash, err = readHashfile(store_root + "libraries/" + path + ".sha1")
-		if(err != nil) { return err }
+		if(err != nil) { return }
+		obj.Hash, err = readHashfile(store_root + "libraries/" + path + ".sha1")
+		if(err != nil) { return }
 	} else if(verbose) {
 		log.Printf("Hash file for lib \"%s\" already exist\n", filepath.Base(path))
 	}
 	
-	fhash, err := fileHash(store_root + "libraries/" + path)
-	if(err == nil && bytes.Equal(hash, fhash)) {
+	err = checkHash(store_root + "libraries/" + path, obj.Hash)
+	if(err == nil) {
 		if(verbose) {
 			log.Printf("Lib \"%s\" already exist\n", filepath.Base(path))
-		} 
-		return nil
+		}
+		fi, _ := os.Stat(store_root + "libraries/" + path)
+		obj.Size = fi.Size()
+		return
 	}
 	
-	if(err == nil) {
-		log.Printf("Hash sums mismatched to \"%s\": %s != %s. Regetting...",
-		filepath.Base(path), hex.EncodeToString(hash), hex.EncodeToString(fhash))
-	}
+	if(!os.IsNotExist(err)) { log.Printf("%v. Regetting...", err) }
+	
+	_, err = getFile(url["libs"] + path + ".sha1", store_root + "libraries/" + path + ".sha1")
+	if(err != nil) { return }
+	obj.Hash, err = readHashfile(store_root + "libraries/" + path + ".sha1")
+	if(err != nil) { return }
+	
 	_, err = getFile(url["libs"] + path, store_root + "libraries/" + path)
-	if(err != nil) { return err }
+	if(err != nil) { return }
 	
-	fhash, err = fileHash(store_root + "libraries/" + path)
-	if(err != nil) { return fmt.Errorf("Unable to calculate hash sum: %v", err) }
-	
-	if(bytes.Equal(hash, fhash)) { return nil }
-	
-	return fmt.Errorf("Hash sums mismatched to \"%s\": %s != %s. Regetting change noting.",
-		filepath.Base(path), hex.EncodeToString(hash), hex.EncodeToString(fhash))
+	err = checkHash(store_root + "libraries/" + path, obj.Hash)
+	if(err == nil) {
+		fi, _ := os.Stat(store_root + "libraries/" + path)
+		obj.Size = fi.Size()
+	}
+	return 
 }
 
-func readHashfile(full_path string) ([]byte, error) {
+func readHashfile(full_path string) (string, error) {
 	fd, err := os.Open(full_path)
-	if(err != nil) { return nil, err }
+	if(err != nil) { return "", err }
 	defer fd.Close()
 	
 	buf := make([]byte, 40)
 	_, err = fd.Read(buf)
-	if(err != nil) { return nil, err }
-	
-	hash := make([]byte, 20)
-	_, err = hex.Decode(hash, buf)
-	return hash, err
+	return string(buf), err
 }
 
 func parceIndex(path string) (*ObjectList, error) {
@@ -614,12 +626,15 @@ func clean() {
 			if(err != nil) { log.Println("While walking over libraries:", err) }
 			if(info.IsDir()) {
 				return nil
-			} else if(!checked.libs[strings.TrimSuffix(filepath.Base(path), ".sha1")]) {
-				err = os.Remove(path)
-				if(err != nil) {
-					log.Fatal(err)
-				} else if(verbose) {
-					log.Printf("In libs: \"%s\" deleted", info.Name())
+			} else {
+				_, ok := checked.libs[strings.TrimSuffix(filepath.Base(path), ".sha1")]
+				if(!ok){
+					err = os.Remove(path)
+					if(err != nil) {
+						log.Fatal(err)
+					} else if(verbose) {
+						log.Printf("In libs: \"%s\" deleted", info.Name())
+					}
 				}
 			}
 			return nil
