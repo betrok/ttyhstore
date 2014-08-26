@@ -580,15 +580,21 @@ func checkAssets(version string, official bool) (err error) {
 		}
 		local_path := a.Hash[:2] + "/" + a.Hash
 		err := checkHash(store_root + "assets/objects/" + local_path, a.Hash)
-		if(err == nil) { 
-			if(verbose) {
-				log.Printf("Exist: \"%s\"(%s)\n", name, a.Hash)
-			}
-			checked.assets[a.Hash] = true
-			continue
-		} else {
-			if(strings.HasPrefix(err.Error(), "Invalid hash")) { return err }
-			log.Printf("%v. Regetting", err)
+		switch {
+			case err == nil:
+				if(verbose) {
+					log.Printf("Exist: \"%s\"(%s)\n", name, a.Hash)
+				}
+				checked.assets[a.Hash] = true
+				continue
+			
+			case strings.HasPrefix(err.Error(), "Invalid hash"):
+				return err
+			
+			case os.IsNotExist(err):
+				
+			default:
+				log.Printf("%v. Regetting", err)
 		}
 		
 		_, err = getFile(url["assets"] + local_path, store_root + "assets/objects/" + local_path)
@@ -604,7 +610,6 @@ func checkAssets(version string, official bool) (err error) {
 	return
 }
 
-//TODO remove empty dirs
 func clean() {
 	log.Println("Cleaning up...\n")
 	indexes_root := store_root + "assets/indexes/"
@@ -625,16 +630,18 @@ func clean() {
 	filepath.Walk(libs_root, func(path string, info os.FileInfo, err error)(error) {
 			if(err != nil) { log.Println("While walking over libraries:", err) }
 			if(info.IsDir()) {
+				rmEmptyDirs(path)
 				return nil
 			} else {
 				_, ok := checked.libs[strings.TrimSuffix(filepath.Base(path), ".sha1")]
 				if(!ok){
 					err = os.Remove(path)
-					if(err != nil) {
-						log.Fatal(err)
+					if(err != nil && !os.IsNotExist(err)) {
+						log.Fatal("Fatal:", err)
 					} else if(verbose) {
 						log.Printf("In libs: \"%s\" deleted", info.Name())
 					}
+					rmEmptyDirs(filepath.Dir(path))
 				}
 			}
 			return nil
@@ -643,14 +650,16 @@ func clean() {
 	filepath.Walk(store_root + "assets/objects/", func(path string, info os.FileInfo, err error)(error) {
 		if(err != nil) { log.Println("While walking over libraries:", err) }
 		if(info.IsDir()) {
+			rmEmptyDirs(path)
 			return nil
 		} else if(!checked.assets[filepath.Base(path)]) {
 			err = os.Remove(path)
-			if(err != nil) {
+			if(err != nil && !os.IsNotExist(err)) {
 				log.Fatal(err)
 			} else if(verbose) {
 				log.Printf("In assets: \"%s\" deleted", info.Name())
 			}
+			rmEmptyDirs(filepath.Dir(path))
 		}
 		return nil
 	})
@@ -736,7 +745,7 @@ func checkHash(path, hash string) error {
 	}
 	fhash, err := fileHash(path)
 	if(err != nil) {
-		return fmt.Errorf("Hash calculate for \"%s\" failed: %v", filepath.Base(path), err)
+		return err
 	}
 	if(bytes.Equal(dhash, fhash)) { return nil }
 	return fmt.Errorf("Hash sums mismatched for \"%s\":\ndefined:\t %s \ncalicated:\t %s",

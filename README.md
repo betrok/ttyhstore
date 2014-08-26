@@ -62,7 +62,7 @@ Relative to storage root:
     
 *   **/&lt;prefix>/&lt;version>/libs.json**
     
-    Index file for libraries, required by client. All os and arch are included.
+    Index file for libraries, required by client. Any os and arch are included.
     
 *   **/libraries/**
 
