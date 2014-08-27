@@ -628,7 +628,7 @@ func clean() {
 	
 	libs_root := store_root + "libraries/"
 	filepath.Walk(libs_root, func(path string, info os.FileInfo, err error)(error) {
-			if(err != nil) { log.Println("While walking over libraries:", err) }
+			if(err != nil && !os.IsNotExist(err)) { log.Println("While walking over libraries:", err) }
 			if(info.IsDir()) {
 				rmEmptyDirs(path)
 				return nil
@@ -648,7 +648,7 @@ func clean() {
 		})
 	
 	filepath.Walk(store_root + "assets/objects/", func(path string, info os.FileInfo, err error)(error) {
-		if(err != nil) { log.Println("While walking over libraries:", err) }
+		if(err != nil && !os.IsNotExist(err)) { log.Println("While walking over libraries:", err) }
 		if(info.IsDir()) {
 			rmEmptyDirs(path)
 			return nil
