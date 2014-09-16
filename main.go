@@ -101,17 +101,6 @@ func main() {
 				}
 			}
 			
-		case "genindex":
-			if(len(args) != 2) { log.Fatal("genindex expect two arguments") }
-			list, err := genIndex(args[0])
-			if(err != nil) { log.Fatal("genindex failed:", err) }
-			data, _ := json.MarshalIndent(list, "", "  ")
-			fd, err := os.Create(args[1])
-			if(err != nil) { log.Fatal("Create index file failed:", err) }
-			fd.Write(data)
-			fd.Close()
-			
-			
 		default:
 			flag.Usage()
 	}
@@ -371,7 +360,7 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 			log.Println("Files: OK")
 			
 		case os.IsNotExist(err):
-			log.Println("Files aren't presented")
+			log.Println("Files aren't present")
 		
 		default:
 			return
@@ -572,7 +561,7 @@ func collectCustoms(vers_root string) (cust *Customs, err error) {
 				if(len(path) == 0) { continue }
 				cust.Mutables = append(cust.Mutables, path)
 				if _, ok := cust.Index[path]; !ok {
-					log.Printf("W: File \"%s\" from mutables.list isn't presented in files/", path)
+					log.Printf("W: File \"%s\" from mutables.list isn't present in files/", path)
 				}
 			}
 			fd.Close()
@@ -722,29 +711,6 @@ func rmEmptyDirs(path string) (err error) {
 		flist, _ = ioutil.ReadDir(path)
 	}
 	return err
-}
-
-func genIndex(root string) (*ObjectList, error) {
-	if(root[len(root) - 1] != '/') {
-		root += "/"
-	}
-	list := newObjectList()
-	
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if(err != nil) {
-			log.Println("While walking:", err)
-			return err
-		}
-		if(info.IsDir()) { return nil }
-		
-		hash, err := fileHash(path)
-		if(err != nil) { return err }
-		list.Data[strings.TrimPrefix(path, root)] = FInfo{ hex.EncodeToString(hash), info.Size() }
-		
-		return nil
-	})
-	
-	return list, err
 }
 
 func getFile(url, dest_path string) (int64, error) {
