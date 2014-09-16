@@ -58,8 +58,8 @@ Relative to storage root:
     ```
     {
         "main": {
-            "Hash": "<sha1 of <version>.jar>",
-            "Size": <size of <version>.jar>
+            "hash": "<sha1 of <version>.jar>",
+            "size": <size of <version>.jar>
         },
         "objects": {
             [usual index for libraries, required by client. Any os and arch are included.]
