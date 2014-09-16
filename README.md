@@ -52,7 +52,6 @@ Relative to storage root:
     May contains optional non-standard fields:
     - `"jarHash": "<sha1 of <version>.jar>"` may be used on client check
     - `"jarSize": <size of <version>.jar>`
-    - `"customAssets": <bool>` do not try to load official asserts index if it's missing
 
 *   **/&lt;prefix>/&lt;version>/files.json**
     

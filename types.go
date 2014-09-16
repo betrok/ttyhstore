@@ -37,7 +37,6 @@ type VInfoFull struct {
 	Arguments		string		`json:"minecraftArguments"`
 	LVersion		int			`json:"minimumLauncherVersion"`
 	Assets			string		`json:"assets"`
-	CustomAssets	bool		`json:"customAssets"`
 	Libs			[]*LibInfo	`json:"libraries"`
 	MainClass		string		`json:"mainClass"`
 }

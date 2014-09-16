@@ -362,7 +362,7 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	log.Printf("%v.jar: OK", version)
 	
 	if(len(vinfo.Assets) != 0) {
-		err = checkAssets(vinfo.Assets, !vinfo.CustomAssets)
+		err = checkAssets(vinfo.Assets)
 		if(err != nil) { return }
 		log.Println("Assets: OK")
 	} else {
@@ -566,7 +566,7 @@ func checkFiles(vers_root string) (error) {
 	return nil
 }
 
-func checkAssets(version string, official bool) (err error) {
+func checkAssets(version string) (err error) {
 	log.Printf("Checking assets \"%s\"...\n", version)
 	
 	if(checked.indexes[version + ".json"]) {
@@ -581,7 +581,7 @@ func checkAssets(version string, official bool) (err error) {
 	
 	list, err := parseIndex(store_root + "assets/indexes/" + version + ".json")
 	if(err != nil) {
-		if(os.IsNotExist(err) && official) {
+		if(os.IsNotExist(err)) {
 			log.Printf("W: Assets index \"%s\" not found, downloading official version", version)
 			_, err = getFile(url["indexes"] + version + ".json", store_root + "assets/indexes/" + version + ".json")
 			if(err != nil) { return }
