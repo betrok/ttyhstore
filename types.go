@@ -70,7 +70,7 @@ type FIndex map[string]FInfo
 
 type Customs struct {
 	Mutables	[]string	`json:"mutables"`
-	Index		FIndex		`jsom:"index"`
+	Index		FIndex		`json:"index"`
 }
 func newCustoms() *Customs {
 	return &Customs{ make([]string, 0, 10), make(FIndex) }
