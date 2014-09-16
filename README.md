@@ -29,11 +29,17 @@ Relative to storage root:
     ```
     {
         "about": "<about>",
-        "type": "<type>"
+        "type": "<type>",
+        "latest": {
+            "<vers_type1>": "<vers_name1>",
+            [...]
+        }
     }
     ```
     
     If this file is not presented defaults are `{"about" = "", "type" = "public"}`.
+    
+    Optional *"latest"* files overwrite latest versions in versions.json manually. Default chaise based on releaseTime in <version>.json 
     
 *   **/&lt;prefix>/versions/versions.json**
 
@@ -44,13 +50,13 @@ Relative to storage root:
 *   **/&lt;prefix>/&lt;version>/&lt;version>.json**
     
     May contains optional non-standard fields:
-    - `"jarHash": "<sha1 of <version>.jar>"`
-    - `"customFiles": <bool>` see bellow
+    - `"jarHash": "<sha1 of <version>.jar>"` may be used on client check
+    - `"jarSize": <size of <version>.jar>`
     - `"customAssets": <bool>` do not try to load official asserts index if it's missing
 
 *   **/&lt;prefix>/&lt;version>/files.json**
     
-    If *"customAssets"* in **&lt;version>.json** is *true*, **ttyhstore** will check custom files, defined hire.
+    If this file exists, **ttyhstore** will check custom files defined hire, *"customFiles": true* will be append to **jars.json**.
     
     **files.json** format is fully similar to assets indexes.
 
@@ -60,9 +66,22 @@ Relative to storage root:
     
     For file with relative path *&lt;path>* place will be just **/&lt;prefix>/&lt;version>/files/&lt;path>**.
     
-*   **/&lt;prefix>/&lt;version>/libs.json**
+*   **/&lt;prefix>/&lt;version>/jars.json**
+
+    ```
+    {
+        "customFiles": <bool>,
+        "main": {
+            "Hash": "<sha1 of <version>.jar>",
+            "Size": <size of <version>.jar>
+        },
+        "objects": {
+            [Usual index for libraries, required by client. Any os and arch are included.]
+        }
+    }
+    ```
     
-    Index file for libraries, required by client. Any os and arch are included.
+    Generated on cli checking.
     
 *   **/libraries/**
 
@@ -100,7 +119,7 @@ Create **/&lt;prefix>/&lt;your version>/** directory, place there **&lt;version>
 
 For libraries, that aren't presented in official repo, place **&lt;lib name>.jar** and **&lt;lib name>.jar.sha1** hash file to **/libraries/** follows minecraft path policy.
 
-If your build need some specific files, append `"customFiles": true` to **&lt;versions>.json**. Generate index **files.json**, place it in **/&lt;prefix>/&lt;your version>**, files in **/&lt;prefix>/&lt;your version>/files/**.
+If your build need some specific files, create index **files.json** and place it in **/&lt;prefix>/&lt;your version>**, files in **/&lt;prefix>/&lt;your version>/files/**.
 
 **files.json** may be generated with
 ```

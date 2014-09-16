@@ -33,11 +33,11 @@ func (p VersSlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 type VInfoFull struct {
 	VInfoMin
 	JarHash			string		`json:"jarHash"`
+	JarSize			int64		`json:"jarSize"`
 	Arguments		string		`json:"minecraftArguments"`
 	LVersion		int			`json:"minimumLauncherVersion"`
 	Assets			string		`json:"assets"`
 	CustomAssets	bool		`json:"customAssets"`
-	CustomFiles		bool		`json:"customFiles"`
 	Libs			[]*LibInfo	`json:"libraries"`
 	MainClass		string		`json:"mainClass"`
 }
@@ -63,6 +63,15 @@ func newObjectList() *ObjectList {
 	return &ObjectList{ make(map[string] Object) }
 }
 
+type JarList struct {
+	CustomFiles	bool	`json:"customFiles"`
+	Main		Object	`json:"main"`
+	*ObjectList
+}
+func newJarList() *JarList {
+	return &JarList{ObjectList: newObjectList()}
+}
+
 type Object struct {
 	Hash	string	`json:"hash"`
 	Size	int64	`json:"size"`
@@ -71,6 +80,10 @@ type Object struct {
 type PrefixInfo struct {
 	About	string	`json:"about"`
 	Type	string	`json:"type"`
+}
+type PrefixInfoExt struct {
+	PrefixInfo
+	Latest	map[string]string	`json:"latest"`
 }
 
 type PrefixList struct {
@@ -123,7 +136,7 @@ Options:
 		
 	--last=<prefix1>/<type1>:<version1>[,<prefix2>/<type2>:<version2>][...]
 		Overwrite latest versions in versions.json manually.
-		Default chaise based on releaseTime in <version>.json
+		Default chaise based on releaseTime in <version>.json.
 		
 	--cleanup
 		After collect delete all libraries and assets,

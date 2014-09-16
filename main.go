@@ -227,7 +227,7 @@ func collectPrefix(prefix_root string) PrefixInfo {
 		log.Fatal(err)
 	}
 	
-	var pinfo PrefixInfo
+	var pinfo PrefixInfoExt
 	var fd *os.File
 	if fd, err = os.Open(prefix_root + "prefix.json"); err == nil {
 		decoder := json.NewDecoder(fd)
@@ -237,6 +237,13 @@ func collectPrefix(prefix_root string) PrefixInfo {
 	if(err != nil) { 
 		log.Println("W: prefix.json read failed, use generic info\n")
 		pinfo.Type = "public"
+	} else {
+		for t, v := range(pinfo.Latest) {
+			full_type := prefix + "/" + t
+			if _, ok := custom_last[full_type]; !ok {
+				custom_last[full_type] = v
+			}
+		}
 	}
 	
 	new_vers := newVersions()
@@ -297,7 +304,7 @@ func collectPrefix(prefix_root string) PrefixInfo {
 	fd.Close()
 	log.Printf("\nDone in prefix \"%s\"\n\n", prefix)
 	
-	return pinfo
+	return pinfo.PrefixInfo
 }
 
 func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
@@ -325,17 +332,27 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	log.Printf("%v.json: OK", version)
 	
 	vers_root := prefix_root + version + "/"
+	jar_path := vers_root + version + ".jar"
+	
+	var jar_list JarList
+	
+	info, err := os.Stat(jar_path)
+	if(err != nil) { return }
+	fhash, err := fileHash(jar_path)
+	if(err != nil) { return }
+	jar_list.Main.Hash = hex.EncodeToString(fhash)
+	jar_list.Main.Size = info.Size()
+	
 	
 	switch len(vinfo.JarHash) {
 		case 0:
-			if _, err = os.Stat(vers_root + version + ".jar"); err != nil {
-				return
+			if(vinfo.JarSize != 0 && vinfo.JarSize != info.Size()) {
+				return nil, fmt.Errorf(".jar file size mismatched with defined")
 			}
 			
 		case 40:
-			err := checkHash(vers_root + version + ".jar", vinfo.JarHash)
-			if(err != nil) {
-				return nil, err
+			if(vinfo.JarHash != jar_list.Main.Hash) {
+				return nil, fmt.Errorf(".jar file hash mismatched with defined")
 			}
 			
 		default:
@@ -343,18 +360,6 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	}
 	
 	log.Printf("%v.jar: OK", version)
-	if _, err = os.Stat(vers_root + version + "-tweaker.jar"); err != nil {
-		log.Printf("W: Tweaker not found for \"%s\"", version)
-	}
-	
-	libindex, err := checkLibs(vinfo.Libs)
-	if(err != nil) { return }
-	data, _ = json.MarshalIndent(libindex, "", "  ")
-	fd, err = os.Create(vers_root + "libs.json")
-	if(err != nil) { log.Fatal("Create index file libs.json failed:", err) }
-	fd.Write(data)
-	fd.Close()
-	log.Println("Libs: OK")
 	
 	if(len(vinfo.Assets) != 0) {
 		err = checkAssets(vinfo.Assets, !vinfo.CustomAssets)
@@ -365,11 +370,29 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	}
 	if(err != nil) { return }
 	
-	if(vinfo.CustomFiles) {
-		err = checkFiles(vers_root)
-		if(err != nil) { return }
-		log.Println("Files: OK")
+	err = checkFiles(vers_root)
+	switch {
+		case err == nil:
+			log.Println("Files: OK")
+			jar_list.CustomFiles = true
+			
+		case os.IsNotExist(err):
+			log.Println("Files aren't presented")
+			err = nil
+		
+		default:
+			return
 	}
+	
+	jar_list.ObjectList, err = checkLibs(vinfo.Libs)
+	if(err != nil) { return }
+	
+	data, _ = json.MarshalIndent(jar_list, "", "  ")
+	fd, err = os.Create(vers_root + "jars.json")
+	if(err != nil) { log.Fatal("Create index file jars.json failed:", err) }
+	fd.Write(data)
+	fd.Close()
+	log.Println("Libs: OK")
 	
 	log.Printf("Cli \"%s\" seems to be suitable", version)
 	return
@@ -516,7 +539,7 @@ func readHashfile(full_path string) (string, error) {
 	return string(buf), err
 }
 
-func parceIndex(path string) (*ObjectList, error) {
+func parseIndex(path string) (*ObjectList, error) {
 	fd, err := os.Open(path)
 	if(err != nil) { return nil, err }
 	
@@ -530,7 +553,7 @@ func parceIndex(path string) (*ObjectList, error) {
 
 func checkFiles(vers_root string) (error) {
 	log.Printf("Checking files for \"%s\"...\n", filepath.Base(vers_root))
-	list, err := parceIndex(vers_root + "files.json")
+	list, err := parseIndex(vers_root + "files.json")
 	if(err != nil) { return err }
 	
 	for name, a := range(list.Data) {
@@ -556,13 +579,13 @@ func checkAssets(version string, official bool) (err error) {
 	if err = os.MkdirAll(store_root + "assets/indexes/", os.ModeDir | 0755); err != nil { return }
 	if err = os.MkdirAll(store_root + "assets/objects/", os.ModeDir | 0755); err != nil { return }
 	
-	list, err := parceIndex(store_root + "assets/indexes/" + version + ".json")
+	list, err := parseIndex(store_root + "assets/indexes/" + version + ".json")
 	if(err != nil) {
 		if(os.IsNotExist(err) && official) {
 			log.Printf("W: Assets index \"%s\" not found, downloading official version", version)
 			_, err = getFile(url["indexes"] + version + ".json", store_root + "assets/indexes/" + version + ".json")
 			if(err != nil) { return }
-			list, err = parceIndex(store_root + "assets/indexes/" + version + ".json")
+			list, err = parseIndex(store_root + "assets/indexes/" + version + ".json")
 			if(err != nil) { return }
 		} else { return }
 	}
