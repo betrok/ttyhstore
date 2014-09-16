@@ -121,7 +121,7 @@ Create **/&lt;prefix>/&lt;your version>/** directory, place there **&lt;version>
 
 For libraries, that aren't presented in official repo, place **&lt;lib name>.jar** and **&lt;lib name>.jar.sha1** hash file to **/libraries/** follows minecraft path policy.
 
-If your build need some specific files, place them in **/&lt;prefix>/&lt;your version>**, files in **/&lt;prefix>/&lt;your version>/files/**. Index will be generated on cli check.
+If your build need some specific files, place them in **/&lt;prefix>/&lt;your version>/files/**. Index will be generated on cli check.
 
 To make sure that everything is correct and download missing asserts and libraries, run
 ```
