@@ -39,7 +39,7 @@ Relative to storage root:
     
     If this file is not presented defaults are `{"about" = "", "type" = "public"}`.
     
-    Optional *"latest"* files overwrite latest versions in versions.json manually. Default chaise based on releaseTime in <version>.json 
+    Optional *"latest"* files overwrite latest versions in versions.json manually. Default chaise based on releaseTime in /&lt;version>.json 
     
 *   **/&lt;prefix>/versions/versions.json**
 
@@ -49,15 +49,9 @@ Relative to storage root:
 
 *   **/&lt;prefix>/&lt;version>/&lt;version>.json**
     
-    May contains optional non-standard fields:
-    - `"jarHash": "<sha1 of <version>.jar>"` may be used on client check
+    May contains optional non-standard fields, used for check .jar file:
+    - `"jarHash": "<sha1 of <version>.jar>"`
     - `"jarSize": <size of <version>.jar>`
-
-*   **/&lt;prefix>/&lt;version>/files.json**
-    
-    If this file exists, **ttyhstore** will check custom files defined hire, *"customFiles": true* will be append to **jars.json**.
-    
-    **files.json** format is fully similar to assets indexes.
     
 *   **/&lt;prefix>/&lt;version>/data.json**
 
