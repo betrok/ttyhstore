@@ -56,24 +56,36 @@ type Rule struct {
 }
 
 type ObjectList struct {
-	Data map[string] Object	`json:"objects"`
+	Data FIndex	`json:"objects"`
 }
 func newObjectList() *ObjectList {
-	return &ObjectList{ make(map[string] Object) }
+	return &ObjectList{ make(FIndex) }
 }
 
-type JarList struct {
-	CustomFiles	bool	`json:"customFiles"`
-	Main		Object	`json:"main"`
-	*ObjectList
-}
-func newJarList() *JarList {
-	return &JarList{ObjectList: newObjectList()}
-}
-
-type Object struct {
+type FInfo struct {
 	Hash	string	`json:"hash"`
 	Size	int64	`json:"size"`
+}
+type FIndex map[string]FInfo
+
+type Customs struct {
+	Mutables	[]string	`json:"mutables"`
+	Index		FIndex		`jsom:"index"`
+}
+func newCustoms() *Customs {
+	return &Customs{ make([]string, 0, 10), make(FIndex) }
+}
+
+type FilesInfo struct {
+	Main	FInfo		`json:"main"`
+	Libs	FIndex		`json:"libs"`
+	Files	*Customs	`json:"files"`
+}
+func newFilesInfo() *FilesInfo {
+	return &FilesInfo {
+		Libs: make(FIndex),
+		Files: newCustoms(),
+	}
 }
 
 type PrefixInfo struct {

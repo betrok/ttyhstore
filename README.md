@@ -43,7 +43,7 @@ Relative to storage root:
     
 *   **/&lt;prefix>/versions/versions.json**
 
-   Similar to http://s3.amazonaws.com/Minecraft.Download/versions/versions.json for current prefix.
+   Simular to http://s3.amazonaws.com/Minecraft.Download/versions/versions.json for current prefix.
    
 *   **/&lt;prefix>/&lt;version>/&lt;version>.jar**
 
@@ -58,29 +58,38 @@ Relative to storage root:
     If this file exists, **ttyhstore** will check custom files defined hire, *"customFiles": true* will be append to **jars.json**.
     
     **files.json** format is fully similar to assets indexes.
-
-*   **/&lt;prefix>/&lt;version>/files/**
-
-    Contains custom files, defined in **files.json**.
     
-    For file with relative path *&lt;path>* place will be just **/&lt;prefix>/&lt;version>/files/&lt;path>**.
-    
-*   **/&lt;prefix>/&lt;version>/jars.json**
+*   **/&lt;prefix>/&lt;version>/data.json**
 
     ```
     {
-        "customFiles": <bool>,
         "main": {
             "Hash": "<sha1 of <version>.jar>",
             "Size": <size of <version>.jar>
         },
         "objects": {
-            [Usual index for libraries, required by client. Any os and arch are included.]
+            [usual index for libraries, required by client. Any os and arch are included.]
+        },
+        "files": {
+			"mutables": [
+				array from mutables.list(see below)
+			],
+			index: {
+				[usual index of files, located in /files/]
+			}
         }
     }
     ```
     
     Generated on cli checking.
+    
+*   **/files/**
+
+    Contains custom files, e.g. setvers.dat or mods.
+    
+*   **/mutables.list**
+
+    Plain text list of files, thats may be changed by user.
     
 *   **/libraries/**
 
@@ -118,14 +127,7 @@ Create **/&lt;prefix>/&lt;your version>/** directory, place there **&lt;version>
 
 For libraries, that aren't presented in official repo, place **&lt;lib name>.jar** and **&lt;lib name>.jar.sha1** hash file to **/libraries/** follows minecraft path policy.
 
-If your build need some specific files, create index **files.json** and place it in **/&lt;prefix>/&lt;your version>**, files in **/&lt;prefix>/&lt;your version>/files/**.
-
-**files.json** may be generated with
-```
-ttyhstore genindex <path to files root> <output file>
-```
-
-*genindex* use absolute or relative to working directory paths, storage root means noting for it. 
+If your build need some specific files, place them in **/&lt;prefix>/&lt;your version>**, files in **/&lt;prefix>/&lt;your version>/files/**. Index will be generated on cli check.
 
 To make sure that everything is correct and download missing asserts and libraries, run
 ```

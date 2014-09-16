@@ -9,6 +9,7 @@ import (
 	"time"
 	"flag"
 	"bytes"
+	"bufio"
 	"strings"
 	"net/http"
 	"io/ioutil"
@@ -36,15 +37,14 @@ var (
 	custom_last = map[string] string {}
 	ignore_list = map[string] bool {}
 	
-	clone = ""
-	prefix = ""
+	clone, prefix string
 	
 	verbose, cleanup bool
 	
 	checked = struct {
-		libs map[string] Object
+		libs map[string] FInfo
 		indexes, assets map[string] bool
-	}{ map[string]Object{}, map[string]bool{}, map[string]bool{} }
+	}{ map[string]FInfo{}, map[string]bool{}, map[string]bool{} }
 	
 	invalids bool
 )
@@ -267,7 +267,7 @@ func collectPrefix(prefix_root string) PrefixInfo {
 			}
 		} else {
 			invalids = true
-			log.Printf("Client \"%s\" check failed: %v\n", fi.Name(), err)
+			log.Fatalf("Client \"%s\" check failed: %v\n", fi.Name(), err)
 		}
 		log.Println()
 	}
@@ -321,7 +321,7 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	log.Println(string(data))
 	
 	if(len(vinfo.Arguments) == 0 || len(vinfo.MainClass) == 0) {
-		err = fmt.Errorf("Arguments or mainClass not defined")
+		err = fmt.Errorf("Arguments or mainClass aren't defined")
 		return
 	}
 	
@@ -334,24 +334,19 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	vers_root := prefix_root + version + "/"
 	jar_path := vers_root + version + ".jar"
 	
-	var jar_list JarList
+	var files FilesInfo
 	
-	info, err := os.Stat(jar_path)
+	files.Main, err = getFInfo(jar_path)
 	if(err != nil) { return }
-	fhash, err := fileHash(jar_path)
-	if(err != nil) { return }
-	jar_list.Main.Hash = hex.EncodeToString(fhash)
-	jar_list.Main.Size = info.Size()
-	
 	
 	switch len(vinfo.JarHash) {
 		case 0:
-			if(vinfo.JarSize != 0 && vinfo.JarSize != info.Size()) {
+			if(vinfo.JarSize != 0 && vinfo.JarSize != files.Main.Size) {
 				return nil, fmt.Errorf(".jar file size mismatched with defined")
 			}
 			
 		case 40:
-			if(vinfo.JarHash != jar_list.Main.Hash) {
+			if(vinfo.JarHash != files.Main.Hash) {
 				return nil, fmt.Errorf(".jar file hash mismatched with defined")
 			}
 			
@@ -366,30 +361,28 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 		if(err != nil) { return }
 		log.Println("Assets: OK")
 	} else {
-		log.Printf("W: No assets defined in \"%s\"\n", version)
+		log.Printf("W: No assets defined for \"%s\"\n", version)
 	}
 	if(err != nil) { return }
 	
-	err = checkFiles(vers_root)
+	files.Files, err = collectCustoms(vers_root)
 	switch {
 		case err == nil:
 			log.Println("Files: OK")
-			jar_list.CustomFiles = true
 			
 		case os.IsNotExist(err):
 			log.Println("Files aren't presented")
-			err = nil
 		
 		default:
 			return
 	}
 	
-	jar_list.ObjectList, err = checkLibs(vinfo.Libs)
+	files.Libs, err = checkLibs(vinfo.Libs)
 	if(err != nil) { return }
 	
-	data, _ = json.MarshalIndent(jar_list, "", "  ")
-	fd, err = os.Create(vers_root + "jars.json")
-	if(err != nil) { log.Fatal("Create index file jars.json failed:", err) }
+	data, _ = json.MarshalIndent(files, "", "  ")
+	fd, err = os.Create(vers_root + "data.json")
+	if(err != nil) { log.Fatal("Create index file data.json failed:", err) }
 	fd.Write(data)
 	fd.Close()
 	log.Println("Libs: OK")
@@ -398,7 +391,7 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	return
 }
 
-func checkLibs(libInfo []*LibInfo) (index *ObjectList, err error) {
+func checkLibs(libInfo []*LibInfo) (index FIndex, err error) {
 	log.Println("Checking libs...")
 	path_list := make([]string, 0, 10)
 	for _, lib := range(libInfo) {
@@ -442,7 +435,7 @@ func checkLibs(libInfo []*LibInfo) (index *ObjectList, err error) {
 		}
 	}
 	
-	index = newObjectList()
+	index = make(FIndex)
 	for _, path := range(path_list) {
 		info, ok := checked.libs[filepath.Base(path)]
 		if(ok) {
@@ -455,7 +448,7 @@ func checkLibs(libInfo []*LibInfo) (index *ObjectList, err error) {
 			}
 			checked.libs[filepath.Base(path)] = info
 		}
-		index.Data[path] = info
+		index[path] = info
 	}
 	return index, nil
 }
@@ -487,43 +480,44 @@ func genNeeders(rules []Rule) []string {
 	return ns
 }
 
-func getLib(path string) (obj Object, err error) {
-	obj.Hash, err = readHashfile(store_root + "libraries/" + path + ".sha1")
+func getLib(path string) (obj FInfo, err error) {
+	full_path := store_root + "libraries/" + path
+	obj.Hash, err = readHashfile(full_path + ".sha1")
 	if(err != nil) {
 		if(!os.IsNotExist(err)) {
 			log.Printf("While reading hash file for \"%s\": %v", filepath.Base(path), err)
 		}
-		_, err = getFile(url["libs"] + path + ".sha1", store_root + "libraries/" + path + ".sha1")
+		_, err = getFile(url["libs"] + path + ".sha1", full_path + ".sha1")
 		if(err != nil) { return }
-		obj.Hash, err = readHashfile(store_root + "libraries/" + path + ".sha1")
+		obj.Hash, err = readHashfile(full_path + ".sha1")
 		if(err != nil) { return }
 	} else if(verbose) {
 		log.Printf("Hash file for lib \"%s\" already exist\n", filepath.Base(path))
 	}
 	
-	err = checkHash(store_root + "libraries/" + path, obj.Hash)
+	err = checkHash(full_path, obj.Hash)
 	if(err == nil) {
 		if(verbose) {
 			log.Printf("Lib \"%s\" already exist\n", filepath.Base(path))
 		}
-		fi, _ := os.Stat(store_root + "libraries/" + path)
+		fi, _ := os.Stat(full_path)
 		obj.Size = fi.Size()
 		return
 	}
 	
 	if(!os.IsNotExist(err)) { log.Printf("%v. Regetting...", err) }
 	
-	_, err = getFile(url["libs"] + path + ".sha1", store_root + "libraries/" + path + ".sha1")
+	_, err = getFile(url["libs"] + path + ".sha1", full_path + ".sha1")
 	if(err != nil) { return }
-	obj.Hash, err = readHashfile(store_root + "libraries/" + path + ".sha1")
-	if(err != nil) { return }
-	
-	_, err = getFile(url["libs"] + path, store_root + "libraries/" + path)
+	obj.Hash, err = readHashfile(full_path + ".sha1")
 	if(err != nil) { return }
 	
-	err = checkHash(store_root + "libraries/" + path, obj.Hash)
+	_, err = getFile(url["libs"] + path, full_path)
+	if(err != nil) { return }
+	
+	err = checkHash(full_path, obj.Hash)
 	if(err == nil) {
-		fi, _ := os.Stat(store_root + "libraries/" + path)
+		fi, _ := os.Stat(full_path)
 		obj.Size = fi.Size()
 	}
 	return 
@@ -551,19 +545,48 @@ func parseIndex(path string) (*ObjectList, error) {
 	return list, err
 }
 
-func checkFiles(vers_root string) (error) {
-	log.Printf("Checking files for \"%s\"...\n", filepath.Base(vers_root))
-	list, err := parseIndex(vers_root + "files.json")
-	if(err != nil) { return err }
+func collectCustoms(vers_root string) (cust *Customs, err error) {
+	log.Printf("Collecting files for \"%s\"...\n", filepath.Base(vers_root))
 	
-	for name, a := range(list.Data) {
-		err = checkHash(vers_root + "files/" + name, a.Hash)
-		if(err != nil) { return nil }
-		if(verbose) {
-			log.Printf("File \"%s\" checked successfully\n", name)
-		}
+	cust = newCustoms()
+	
+	root := vers_root + "files/"
+	if _, err := os.Stat(root); err != nil {
+		return cust, err
 	}
-	return nil
+	err = filepath.Walk(root, func(path string, info os.FileInfo, err error)(error) {
+		if(err != nil) { return fmt.Errorf("While walking over files: %v", err) }
+		if(!info.IsDir()) {
+			cust.Index[strings.TrimPrefix(path, root)], err = getFInfo(path)
+		}
+		return err
+	})
+	if(err != nil) { return nil, err }
+	
+	fd, err := os.Open(vers_root + "mutables.list")
+	switch {
+		case err == nil:
+			scanner := bufio.NewScanner(fd)
+			for scanner.Scan() {
+				path := strings.TrimSpace(scanner.Text())
+				if(len(path) == 0) { continue }
+				cust.Mutables = append(cust.Mutables, path)
+				if _, ok := cust.Index[path]; !ok {
+					log.Printf("W: File \"%s\" from mutables.list isn't presented in files/", path)
+				}
+			}
+			fd.Close()
+			
+			if err = scanner.Err(); err != nil {
+				return nil, fmt.Errorf("Reading mutables.list failed:", err)
+			}
+		
+		case os.IsNotExist(err):
+			
+		default:
+			return nil, fmt.Errorf("Reading mutables.list failed:", err)
+	}
+	return cust, nil
 }
 
 func checkAssets(version string) (err error) {
@@ -716,7 +739,7 @@ func genIndex(root string) (*ObjectList, error) {
 		
 		hash, err := fileHash(path)
 		if(err != nil) { return err }
-		list.Data[strings.TrimPrefix(path, root)] = Object{ hex.EncodeToString(hash), info.Size() }
+		list.Data[strings.TrimPrefix(path, root)] = FInfo{ hex.EncodeToString(hash), info.Size() }
 		
 		return nil
 	})
@@ -774,6 +797,18 @@ func checkHash(path, hash string) error {
 	return fmt.Errorf("Hash sums mismatched for \"%s\":\ndefined:\t %s \ncalicated:\t %s",
 					filepath.Base(path), hash, hex.EncodeToString(fhash))
 
+}
+
+func getFInfo(path string) (info FInfo, err error) {
+	s, err := os.Stat(path)
+	if(err != nil) { return }
+	info.Size = s.Size()
+	
+	fhash, err := fileHash(path)
+	if(err != nil) { return }
+	
+	info.Hash = hex.EncodeToString(fhash)
+	return
 }
 
 func fileHash(path string) ([]byte, error) {
