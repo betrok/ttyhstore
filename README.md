@@ -7,7 +7,7 @@ It features:
 *   Custom files (e.g. mod files) are also supported.
 
 ### License
-This software is licensed under MIT license. The full text of license and list your right you can find in LICENSE file.
+This software is licensed under MIT license. The full text of license and list your right you can find in `LICENSE` file.
 
 ### Repository filesystem structure
 Data storage model mostly follows official update server model (see [wiki.vg](http://wiki.vg/Game_Files) for details).
@@ -16,6 +16,7 @@ All paths from now is relative to *storage root* directory.
 
 Filesystem structure:
 *   `prefixes.json`
+    
     Contains list of prefixes collected from `<prefix>/prefix.json`.
     
     File contents:
@@ -31,11 +32,15 @@ Filesystem structure:
     
     There:
     *   Field `about`
+    
         Collected `about` field from `<prefix>/prefix.json`
+        
     *   Field `type`
+    
         Collected `type` field from `<prefix>/prefix.json`
 
 *   `<prefix>/prefix.json`
+    
     File contents:
     
         {
@@ -49,15 +54,19 @@ Filesystem structure:
     
     There:
     *   Field `about`
+    
         Contains short description about this prefix.
         
     *   Field `type`
+    
         If this field contains `hidden` tag, this prefix will not be listed. Everything else in this field will mark this prefix as *public*, and it *will be* listed in `prefixes.json`.
         
     *   Field `latest`
+    
         Contains object with following fields:
         
         *   `<client_type>` fields
+        
             Name of the field is a description about version contained in value.
             You can add, for example `release` as `<client_type>` with `1.7.10` value, to tag this version as a `release`.
             This field can be exactly the same as `<prefix>/<version>/<version>.json` `type` field.
@@ -72,25 +81,33 @@ Filesystem structure:
         
         There:
         *   `<client_type>`
+        
             Will be `type` field from `<prefix>/<version>/<version>.json`
+            
         *   `<latest_client_version>`
+        
             Will be client version, choosed by `releaseTime` field.
     
     If file `<prefix>/prefix.json` does not exist, defaults will be loaded instead.
     Defaults are `{ "about": "", "type": "public" }`.
     
 *   `<prefix>/versions/versions.json`
+    
     Similar to [versions.json](http://s3.amazonaws.com/Minecraft.Download/versions/versions.json) from official update server, but for current prefix.
     
 *   `<prefix>/<version>/<version>.jar`
+    
     Jar file of this build. Nuff said.
 
 *   `<prefix>/<version>/<version>.json`
+    
     May contain optional non-standard fields, used to check .jar files integrity:
     *   Field `jarHash`
+    
         Contains sha1sum of .jar file as a value
         
     *   Field `jarSize`
+    
         Contains file size as a value
     
     Example:
@@ -100,6 +117,7 @@ Filesystem structure:
     Everything else is similar to official update server file structure.
     
 *   `<prefix>/<version>/data.json`
+    
     Generated automatically on cli checking.
     
     File contents:
@@ -123,40 +141,52 @@ Filesystem structure:
         }
     There:
     *   Field `main`
+    
         Contains sha1sum and file size of `<prefix>/<version>/<version>.jar`
         
         *   Field `hash`
+        
             Contains sha1sum as a value.
             
         *   Field `size`
+        
             Contains file size as a value.
     
     *   Field `libs`
+    
         Contains index of libraries, in usual index format.
     
     *   Field `files`
+    
         Contains information about custom files
         
         *   Field `mutables`
+        
             Contains list of mutable files, filled from plain text file `mutables.list`
             
         *   Field `index`
+        
             Contains index of custom files, in usual index format. Paths are related to `<prefix>/<version>/files/` directory.
     
     
 *   `<prefix>/<version>/files/`
+    
     Contains custom files, e.g. server.dat or mods.
     
 *   `<prefix>/<version>/mutables.list`
+    
     Plain text list of files, thats may be changed by user.
     
 *   `libraries/`
+    
     Similar to https://libraries.minecraft.net/.
 
 *   `assets/indexes/`
+    
     Contain asserts indexes(`<asserts version>.json`), similar to [indexes folder](https://s3.amazonaws.com/Minecraft.Download/indexes/) on official update server.
     
 *   `assets/objects/<first 2 hex letters of hash>/<whole hash>`
+    
     Assets files.
 
 Libraries and assets are shared between all prefixes and versions.
