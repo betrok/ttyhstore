@@ -20,6 +20,7 @@ Filesystem structure:
     Contains list of prefixes collected from `<prefix>/prefix.json`.
     
     File contents:
+    
         {
             "prefixes": {
                 "<prefix>": {
@@ -111,6 +112,7 @@ Filesystem structure:
         Contains file size as a value
     
     Example:
+    
         "jarHash": "<sha1sum>",
         "jarSize": "<filesize>"
     
@@ -121,6 +123,7 @@ Filesystem structure:
     Generated automatically on cli checking.
     
     File contents:
+    
         {
             "main": {
                 "hash": "<sha1sum>",
@@ -179,7 +182,7 @@ Filesystem structure:
     
 *   `libraries/`
     
-    Similar to https://libraries.minecraft.net/.
+    Similar to [libraries.minecraft.net](https://libraries.minecraft.net/).
 
 *   `assets/indexes/`
     
