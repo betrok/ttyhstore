@@ -33,11 +33,11 @@ Filesystem structure:
     
     There:
     *   Field `about`
-    
-        Collected `about` field from `<prefix>/prefix.json`
         
-    *   Field `type`
+        Collected `about` field from `<prefix>/prefix.json`
     
+    *   Field `type`
+        
         Collected `type` field from `<prefix>/prefix.json`
 
 *   `<prefix>/prefix.json`
@@ -55,19 +55,19 @@ Filesystem structure:
     
     There:
     *   Field `about`
-    
+        
         Contains short description about this prefix.
-        
+    
     *   Field `type`
-    
+        
         If this field contains `hidden` tag, this prefix will not be listed. Everything else in this field will mark this prefix as *public*, and it *will be* listed in `prefixes.json`.
-        
-    *   Field `latest`
     
+    *   Field `latest`
+        
         Contains object with following fields:
-        
+    
         *   `<client_type>` fields
-        
+            
             Name of the field is a description about version contained in value.
             You can add, for example `release` as `<client_type>` with `1.7.10` value, to tag this version as a `release`.
             This field can be exactly the same as `<prefix>/<version>/<version>.json` `type` field.
@@ -82,20 +82,20 @@ Filesystem structure:
         
         There:
         *   `<client_type>`
-        
-            Will be `type` field from `<prefix>/<version>/<version>.json`
             
-        *   `<latest_client_version>`
+            Will be `type` field from `<prefix>/<version>/<version>.json`
         
+        *   `<latest_client_version>`
+            
             Will be client version, choosed by `releaseTime` field.
     
     If file `<prefix>/prefix.json` does not exist, defaults will be loaded instead.
     Defaults are `{ "about": "", "type": "public" }`.
-    
+
 *   `<prefix>/versions/versions.json`
     
     Similar to [versions.json](http://s3.amazonaws.com/Minecraft.Download/versions/versions.json) from official update server, but for current prefix.
-    
+
 *   `<prefix>/<version>/<version>.jar`
     
     Jar file of this build. Nuff said.
@@ -103,21 +103,17 @@ Filesystem structure:
 *   `<prefix>/<version>/<version>.json`
     
     May contain optional non-standard fields, used to check .jar files integrity:
+    
     *   Field `jarHash`
-    
-        Contains sha1sum of .jar file as a value
         
-    *   Field `jarSize`
+        Contains sha1sum of .jar file as a value
     
+    *   Field `jarSize`
+        
         Contains file size as a value
     
-    Example:
-    
-        "jarHash": "<sha1sum>",
-        "jarSize": "<filesize>"
-    
     Everything else is similar to official update server file structure.
-    
+
 *   `<prefix>/<version>/data.json`
     
     Generated automatically on cli checking.
@@ -144,42 +140,41 @@ Filesystem structure:
         }
     There:
     *   Field `main`
-    
+        
         Contains sha1sum and file size of `<prefix>/<version>/<version>.jar`
         
         *   Field `hash`
-        
-            Contains sha1sum as a value.
             
-        *   Field `size`
+            Contains sha1sum as a value.
         
+        *   Field `size`
+            
             Contains file size as a value.
     
     *   Field `libs`
-    
+        
         Contains index of libraries, in usual index format.
     
     *   Field `files`
-    
+        
         Contains information about custom files
         
         *   Field `mutables`
-        
-            Contains list of mutable files, filled from plain text file `mutables.list`
             
-        *   Field `index`
+            Contains list of mutable files, filled from plain text file `mutables.list`
         
+        *   Field `index`
+            
             Contains index of custom files, in usual index format. Paths are related to `<prefix>/<version>/files/` directory.
-    
-    
+
 *   `<prefix>/<version>/files/`
     
     Contains custom files, e.g. server.dat or mods.
-    
+
 *   `<prefix>/<version>/mutables.list`
     
     Plain text list of files, thats may be changed by user.
-    
+
 *   `libraries/`
     
     Similar to [libraries.minecraft.net](https://libraries.minecraft.net/).
@@ -187,7 +182,7 @@ Filesystem structure:
 *   `assets/indexes/`
     
     Contain asserts indexes(`<asserts version>.json`), similar to [indexes folder](https://s3.amazonaws.com/Minecraft.Download/indexes/) on official update server.
-    
+
 *   `assets/objects/<first 2 hex letters of hash>/<whole hash>`
     
     Assets files.
@@ -195,7 +190,6 @@ Filesystem structure:
 Libraries and assets are shared between all prefixes and versions.
 
 ### Usage
-
 First of all you need to define `TTYH_STORE` env variable.
 ```bash
     export TTYH_STORE="/path/to/repository"
@@ -216,7 +210,6 @@ Check all clients and generate `versions.json` in all prefixes. `prefixes.json` 
 Done, now you have your own minecraft update server with official 1.7.4 and 1.7.10 versions. At least after you add storage root to web server.
 
 #### Custom client
-
 Create `<prefix>/<your version>/` directory, place there `<version>.json` and `<version>.jar` files.
 
 For libraries, that aren't presented in official repo, copy `<lib name>.jar` and `<lib name>.jar.sha1` files to `libraries/` following minecraft path policy.
@@ -234,7 +227,6 @@ And then regenerate `versions.json`
 ```
 
 #### Delete version or prefix
-
 Just delete directory from repo and run `ttyhstore collect` to exclude it from all lists.
 
 You may also remove all asserts and libraries, that aren't required by any client:
@@ -243,5 +235,4 @@ You may also remove all asserts and libraries, that aren't required by any clien
 ```
 
 #### More
-
 See `ttyhstore help`.
