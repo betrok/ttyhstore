@@ -1,6 +1,6 @@
 ### About
 
-**ttyhstore** is a tool for menage unofficial minecraft update server.
+**ttyhstore** is a tool for managing unofficial minecraft update server.
 
 It features versions.json generate and libraries/assets check/cleanup with ability to download missing from official repository. Custom files(e.g. for mods) are also supported.
 
@@ -132,7 +132,7 @@ Then regenerate **versions.json**
 ttyhstore collect
 ```
 
-#### Delete version/prefix
+#### Delete version or prefix
 
 Just delete directory with it and run `ttyhstore collect` for exclude it from all lists.
 
