@@ -116,56 +116,8 @@ Filesystem structure:
 
 *   `<prefix>/<version>/data.json`
     
-    Generated automatically on cli checking.
+    Generated automatically on `ttyhstore check`.
     
-    File contents:
-    
-        {
-            "main": {
-                "hash": "<sha1sum>",
-                "size": "<size>"
-            },
-            "libs": {
-                {...}
-            },
-            "files": {
-                "mutables": [
-                    "<filename>",
-                    [...]
-                ],
-                index: {
-                    {...}
-                }
-            }
-        }
-    There:
-    *   Field `main`
-        
-        Contains sha1sum and file size of `<prefix>/<version>/<version>.jar`
-        
-        *   Field `hash`
-            
-            Contains sha1sum as a value.
-        
-        *   Field `size`
-            
-            Contains file size as a value.
-    
-    *   Field `libs`
-        
-        Contains index of libraries, in usual index format.
-    
-    *   Field `files`
-        
-        Contains information about custom files
-        
-        *   Field `mutables`
-            
-            Contains list of mutable files, filled from plain text file `mutables.list`
-        
-        *   Field `index`
-            
-            Contains index of custom files, in usual index format. Paths are related to `<prefix>/<version>/files/` directory.
 
 *   `<prefix>/<version>/files/`
     
