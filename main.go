@@ -72,9 +72,8 @@ func main() {
 			
 		case "check":
 			for _, cli := range(args) {
-				part := strings.Split(cli, "/")
 				var err error
-				switch len(part) {
+				switch strings.Count(cli, "/") {
 					case 0:
 						log.Fatal("wtf?")
 						
@@ -82,7 +81,7 @@ func main() {
 						_, err = checkCli(store_root + prefix + "/", cli)
 						
 					case 2:
-						_, err = checkCli(store_root + part[0] + "/", part[1])
+						_, err = checkCli(store_root + cli)
 						
 					default:
 						log.Fatalf("Too many slashes in \"%s\"", cli)
@@ -463,7 +462,7 @@ func genNeeders(rules []Rule) []string {
 				}
 				
 			default:
-				log.Printf("Can't handle unknown rule: %+v", rule)
+				log.Fatalf("Can't handle unknown rule: %+v", rule)
 		}
 	}
 	return ns
@@ -541,7 +540,7 @@ func collectCustoms(vers_root string) (cust *Customs, err error) {
 	
 	root := vers_root + "files/"
 	if _, err := os.Stat(root); err != nil {
-		return cust, err
+		return nil, err
 	}
 	err = filepath.Walk(root, func(path string, info os.FileInfo, err error)(error) {
 		if(err != nil) { return fmt.Errorf("While walking over files: %v", err) }
