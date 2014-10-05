@@ -75,12 +75,9 @@ func main() {
 				var err error
 				switch strings.Count(cli, "/") {
 					case 0:
-						log.Fatal("wtf?")
-						
-					case 1:
 						_, err = checkCli(store_root + prefix + "/" + cli + "/")
 						
-					case 2:
+					case 1:
 						_, err = checkCli(store_root + cli + "/")
 						
 					default:
@@ -268,14 +265,14 @@ func collectPrefix(prefix_root string) PrefixInfo {
 				if(vers.Id == custom) {
 					if(vers.Type != t) {
 						log.Fatalf("In custom latest: mismatched client types for \"%s\"",
-							prefix + "/" + "t")
+							prefix + "/" + t)
 					}
 					valid = true
 					break
 				}
 			}
 			if(!valid) {
-				log.Fatalf("Custom latest for \"%s\" isn't consistent cli", prefix + "/" + "t")
+				log.Fatalf("Custom latest for \"%s\" isn't consistent cli", prefix + "/" + t)
 			}
 			
 			new_vers.Latest[t] = custom
@@ -306,8 +303,6 @@ func checkCli(vers_root string) (vinfo *VInfoFull, err error) {
 		fd.Close()
 	}
 	if(err != nil) { return }
-	data, _ := json.MarshalIndent(vinfo.VInfoMin, "", "  ")
-	log.Println(string(data))
 	
 	if(len(vinfo.Arguments) == 0 || len(vinfo.MainClass) == 0) {
 		err = fmt.Errorf("Arguments or mainClass aren't defined")
@@ -320,11 +315,9 @@ func checkCli(vers_root string) (vinfo *VInfoFull, err error) {
 	}
 	log.Printf("%v.json: OK", version)
 	
-	jar_path := vers_root + version + ".jar"
-	
 	var files FilesInfo
 	
-	files.Main, err = getFInfo(jar_path)
+	files.Main, err = getFInfo(vers_root + version + ".jar")
 	if(err != nil) { return }
 	
 	switch len(vinfo.JarHash) {
@@ -368,7 +361,7 @@ func checkCli(vers_root string) (vinfo *VInfoFull, err error) {
 	files.Libs, err = checkLibs(vinfo.Libs)
 	if(err != nil) { return }
 	
-	data, _ = json.MarshalIndent(files, "", "  ")
+	data, _ := json.MarshalIndent(files, "", "  ")
 	fd, err = os.Create(vers_root + "data.json")
 	if(err != nil) { log.Fatal("Create index file data.json failed:", err) }
 	fd.Write(data)

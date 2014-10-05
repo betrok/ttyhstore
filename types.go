@@ -111,7 +111,7 @@ Commads:
 	check [<prefix1>/]<version1> [[<prefix2>/]<version2>] [...]
 		Check whatever specified clients are consistent,
 		if possible download missing files from official repos.
-		If prefix not provided will search in default.
+		If prefix isn't provided will search in default.
 	
 	collect
 		Check all client versions,
@@ -124,7 +124,7 @@ Commads:
 		Show this message.
 		
 	cleanup
-		Alias to "collect --cleanup"
+		Alias to "--cleanup collect"
 		
 Options:
 	
@@ -142,11 +142,11 @@ Options:
 		
 	--last=<prefix1>/<type1>:<version1>[,<prefix2>/<type2>:<version2>][...]
 		Overwrite latest versions in versions.json manually.
-		Default chaise based on releaseTime in <version>.json.
+		Default choice based on releaseTime in <version>.json.
 		
 	--cleanup
 		After collect delete all libraries and assets,
-		that not required by any client.
-		Cleanup will aborting if any of clis is inconsistent.
+		that aren't required by any client.
+		Cleanup will be abort if any of clis is inconsistent.
 `
 
