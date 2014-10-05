@@ -78,10 +78,10 @@ func main() {
 						log.Fatal("wtf?")
 						
 					case 1:
-						_, err = checkCli(store_root + prefix + "/", cli)
+						_, err = checkCli(store_root + prefix + "/" + cli + "/")
 						
 					case 2:
-						_, err = checkCli(store_root + cli)
+						_, err = checkCli(store_root + cli + "/")
 						
 					default:
 						log.Fatalf("Too many slashes in \"%s\"", cli)
@@ -176,7 +176,7 @@ func cloneCli(prefix_root, cli string) error {
 		prefix_root + cli + "/" + cli + ".json")
 	if(err != nil) { return err }
 	
-	_, err = checkCli(prefix_root, cli)
+	_, err = checkCli(prefix_root + cli + "/")
 	return err
 }
 
@@ -245,7 +245,7 @@ func collectPrefix(prefix_root string) PrefixInfo {
 		if(!fi.IsDir() || fi.Name() == "versions" ||
 			ignore_list[prefix + "/" + fi.Name()]) { continue }
 		
-		vinfo, err := checkCli(prefix_root, fi.Name())
+		vinfo, err := checkCli(prefix_root + fi.Name() + "/")
 		if(err == nil) {
 			new_vers.Versions = append(new_vers.Versions, &vinfo.VInfoMin)
 			lt, ok := new_vers.latestTime[vinfo.Type]
@@ -295,11 +295,12 @@ func collectPrefix(prefix_root string) PrefixInfo {
 	return pinfo.PrefixInfo
 }
 
-func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
+func checkCli(vers_root string) (vinfo *VInfoFull, err error) {
+	version := filepath.Base(vers_root)
 	vinfo = newVInfoFull()
 	log.Printf("Checking cli \"%s\"...\n", version)
 	var fd *os.File
-	if fd, err = os.Open(prefix_root + version + "/" + version + ".json"); err == nil {
+	if fd, err = os.Open(vers_root + version + ".json"); err == nil {
 		decoder := json.NewDecoder(fd)
 		err = decoder.Decode(vinfo)
 		fd.Close()
@@ -319,7 +320,6 @@ func checkCli(prefix_root, version string) (vinfo *VInfoFull, err error) {
 	}
 	log.Printf("%v.json: OK", version)
 	
-	vers_root := prefix_root + version + "/"
 	jar_path := vers_root + version + ".jar"
 	
 	var files FilesInfo
@@ -560,7 +560,7 @@ func collectCustoms(vers_root string) (cust *Customs, err error) {
 				if(len(path) == 0) { continue }
 				cust.Mutables = append(cust.Mutables, path)
 				if _, ok := cust.Index[path]; !ok {
-					log.Printf("W: File \"%s\" from mutables.list isn't present in files/", path)
+					log.Printf("W: File \"%s\" from mutables.list isn't present in /files/", path)
 				}
 			}
 			fd.Close()
