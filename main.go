@@ -310,8 +310,7 @@ func checkCli(vers_root string) (vinfo *VInfoFull, err error) {
 	}
 	
 	if(vinfo.Id != version) {
-		err = fmt.Errorf("Mismatched dir name & client id: \"%s\" != \"%s\"", version, vinfo.Id)
-		return
+		fmt.Printf("W: Mismatched dir name & client id: \"%s\" != \"%s\"\n", version, vinfo.Id)
 	}
 	log.Printf("%v.json: OK", version)
 	
