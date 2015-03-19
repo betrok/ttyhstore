@@ -1,146 +1,238 @@
 ### About
-
 **ttyhstore** is a tool for managing unofficial minecraft update server.
 
-It features versions.json generate and libraries/assets check/cleanup with ability to download missing from official repository. Custom files(e.g. for mods) are also supported.
+It features:
+*   `versions.json` file generation.
+*   `libraries`, `assets` check and cleanup with ability to download missing files from official repository.
+*   Custom files (e.g. mod files) are also supported.
 
+### License
+This software is licensed under MIT license. The full text of license and list your right you can find in `LICENSE` file.
 
-### Repository file structure
+### Repository filesystem structure
+Data storage model mostly follows official update server model (see [wiki.vg](http://wiki.vg/Game_Files) for details).
 
-Data store model mostly follows official(see [wiki.vg](http://wiki.vg/Game_Files) for details).
+All paths from now is relative to *storage root* directory.
 
-Relative to storage root:
-*   **/prefixes.json**
+Filesystem structure:
+*   `prefixes.json`
     
-    Contains list of prefixes generated from **/&lt;prefix>/prefix.json**. If prefix have type *"hidden"*, it will not append hire.
-    ```
-    {
-        "prefixes": {
-            "<prefix>": {
-                "about": "<about>",
-                "type": "<type>"
+    Contains list of prefixes collected from `<prefix>/prefix.json`.
+    
+    File contents:
+    
+        {
+            "prefixes": {
+                "<prefix>": {
+                    "about": "<about>",
+                    "type": "<type>"
+                },
+                [...]
+            }
+        }
+    
+    There:
+    *   Field `about`
+        
+        Collected `about` field from `<prefix>/prefix.json`
+    
+    *   Field `type`
+        
+        Collected `type` field from `<prefix>/prefix.json`
+
+*   `<prefix>/prefix.json`
+    
+    File contents:
+    
+        {
+            "about": "<about>",
+            "type": "<type>",
+            "latest": {
+                "<version_type_1>": "<version_name_1>",
+                [...]
+            }
+        }
+    
+    There:
+    *   Field `about`
+        
+        Contains short description about this prefix.
+    
+    *   Field `type`
+        
+        If this field contains `hidden` tag, this prefix will not be listed. Everything else in this field will mark this prefix as *public*, and it *will be* listed in `prefixes.json`.
+    
+    *   Field `latest`
+        
+        Contains object with following fields:
+    
+        *   `<client_type>` fields
+            
+            Name of the field is a description about version contained in value.
+            You can add, for example `release` as `<client_type>` with `1.7.10` value, to tag this version as a `release`.
+            This field can be exactly the same as `<prefix>/<version>/<version>.json` `type` field.
+        
+        `latest` field is optional. It overrides `latest` versions field in `<prefix>/versions/versions.json`.
+        If `latest` field is ommited, *latest* of the client versions will be choosed by `releaseTime` field.
+        And in `<prefix>/versions/versions.json` `latest` field will be replaced with this:
+        
+            "latest": {
+                "<client_type>": "<latest_client_version>"
+            }
+        
+        There:
+        *   `<client_type>`
+            
+            Will be `type` field from `<prefix>/<version>/<version>.json`
+        
+        *   `<latest_client_version>`
+            
+            Will be client version, choosed by `releaseTime` field.
+    
+    If file `<prefix>/prefix.json` does not exist, defaults will be loaded instead.
+    Defaults are `{ "about": "", "type": "public" }`.
+
+*   `<prefix>/versions/versions.json`
+    
+    Similar to [versions.json](http://s3.amazonaws.com/Minecraft.Download/versions/versions.json) from official update server, but for current prefix.
+
+*   `<prefix>/<version>/<version>.jar`
+    
+    Jar file of this build. Nuff said.
+
+*   `<prefix>/<version>/<version>.json`
+    
+    May contain optional non-standard fields, used to check .jar files integrity:
+    
+    *   Field `jarHash`
+        
+        Contains sha1sum of .jar file as a value
+    
+    *   Field `jarSize`
+        
+        Contains file size as a value
+    
+    Everything else is similar to official update server file structure.
+
+*   `<prefix>/<version>/data.json`
+    
+    Generated automatically on `ttyhstore check`.
+    
+    File contents:
+    
+        {
+            "main": {
+                "hash": "<sha1sum>",
+                "size": "<size>"
             },
-            [...]
+            "libs": {
+                {...}
+            },
+            "files": {
+                "mutables": [
+                    "<filename>",
+                    [...]
+                ],
+                index: {
+                    {...}
+                }
+            }
         }
-    }
-    ```
+    There:
+    *   Field `main`
+        
+        Contains sha1sum and file size of `<prefix>/<version>/<version>.jar`
+        
+        *   Field `hash`
+            
+            Contains sha1sum as a value.
+        
+        *   Field `size`
+            
+            Contains file size as a value.
+    
+    *   Field `libs`
+        
+        Contains index of libraries, in usual index format.
+    
+    *   Field `files`
+        
+        Contains information about custom files
+        
+        *   Field `mutables`
+            
+            Contains list of mutable files, filled from plain text file `mutables.list`
+        
+        *   Field `index`
+            
+            Contains index of custom files, in usual index format. Paths are related to `<prefix>/<version>/files/` directory.
 
-*   **/&lt;prefix>/prefix.json**
-    ```
-    {
-        "about": "<about>",
-        "type": "<type>",
-        "latest": {
-            "<vers_type1>": "<vers_name1>",
-            [...]
-        }
-    }
-    ```
+*   `<prefix>/<version>/files/`
     
-    If this file is not presented defaults are `{"about" = "", "type" = "public"}`.
-    
-    Optional *"latest"* files overwrite latest versions in versions.json manually. Default chaise based on releaseTime in /&lt;version>.json 
-    
-*   **/&lt;prefix>/versions/versions.json**
+    Contains custom files, e.g. server.dat or mods.
 
-   Simular to http://s3.amazonaws.com/Minecraft.Download/versions/versions.json for current prefix.
-   
-*   **/&lt;prefix>/&lt;version>/&lt;version>.jar**
-
-*   **/&lt;prefix>/&lt;version>/&lt;version>.json**
+*   `<prefix>/<version>/mutables.list`
     
-    May contains optional non-standard fields, used for check .jar file:
-    - `"jarHash": "<sha1 of <version>.jar>"`
-    - `"jarSize": <size of <version>.jar>`
-    
-*   **/&lt;prefix>/&lt;version>/data.json**
-
-    ```
-    {
-        "main": {
-            "hash": "<sha1 of <version>.jar>",
-            "size": <size of <version>.jar>
-        },
-        "objects": {
-            [usual index for libraries, required by client. Any os and arch are included.]
-        },
-        "files": {
-			"mutables": [
-				array from mutables.list(see below)
-			],
-			index: {
-				[usual index of files, located in /files/]
-			}
-        }
-    }
-    ```
-    
-    Generated on cli checking.
-    
-*   **/files/**
-
-    Contains custom files, e.g. setvers.dat or mods.
-    
-*   **/mutables.list**
-
     Plain text list of files, thats may be changed by user.
+
+*   `libraries/`
     
-*   **/libraries/**
+    Similar to [libraries.minecraft.net](https://libraries.minecraft.net/).
 
-    Similar to https://libraries.minecraft.net/.
-
-*   **/assets/indexes/**
-
-    Contain asserts indexes(**&lt;asserts version>.json**), similar to https://s3.amazonaws.com/Minecraft.Download/indexes/.
+*   `assets/indexes/`
     
-*   **/assets/objects/&lt;first 2 hex letters of hash>/&lt;whole hash>**
+    Contain asserts indexes(`<asserts version>.json`), similar to [indexes folder](https://s3.amazonaws.com/Minecraft.Download/indexes/) on official update server.
 
+*   `assets/objects/<first 2 hex letters of hash>/<whole hash>`
+    
     Assets files.
-    
-    
+
 Libraries and assets are shared between all prefixes and versions.
 
 ### Usage
-
-First of all you need set **TTYH_STORE** env variable. It's define where will located storage root. You may also use *--root* option, but it's less comfortable.
+First of all you need to define `TTYH_STORE` env variable.
+```bash
+    export TTYH_STORE="/path/to/repository"
+```
+Value of this variable points to repository location. You can also use `--root` option, but it is less comfortable.
 
 #### Minimal example
-Clone passed versions from official repository to default prefix:
+Clone specified versions from official repository to default prefix:
+```bash
+    ttyhstore clone 1.7.4 1.7.10
 ```
-ttyhstore clone 1.7.4 1.7.10
+
+Check all clients and generate `versions.json` in all prefixes. `prefixes.json` will be also updated.
+```bash
+    ttyhstore collect
 ```
-Check all clients and generate **versions.json** in all prefixes. **prefixes.json** will be also updated.
-```
-ttyhstore collect
-```
-Done, now you have your own minecraft update server with official 1.7.4 and 1.7.10 versions. At least after you will append storage root to web server.
+
+Done, now you have your own minecraft update server with official 1.7.4 and 1.7.10 versions. At least after you add storage root to web server.
 
 #### Custom client
+Create `<prefix>/<your version>/` directory, place there `<version>.json` and `<version>.jar` files.
 
-Create **/&lt;prefix>/&lt;your version>/** directory, place there **&lt;version>.json** and **&lt;version>.jar** files.
+For libraries, that aren't presented in official repo, copy `<lib name>.jar` and `<lib name>.jar.sha1` files to `libraries/` following minecraft path policy.
 
-For libraries, that aren't presented in official repo, place **&lt;lib name>.jar** and **&lt;lib name>.jar.sha1** hash file to **/libraries/** follows minecraft path policy.
+If your build need some specific files, place them in `<prefix>/<your version>/files/`. Index will be generated on `ttyhstore check`.
 
-If your build need some specific files, place them in **/&lt;prefix>/&lt;your version>/files/**. Index will be generated on cli check.
-
-To make sure that everything is correct and download missing asserts and libraries, run
+To make sure that everything is correct and to download missing asserts and libraries, run:
+```bash
+    ttyhstore check $prefix/$your_version
 ```
-ttyhstore check <prefix>/<your version>
-```
-Then regenerate **versions.json**
-```
-ttyhstore collect
+
+And then regenerate `versions.json`
+```bash
+    ttyhstore collect
 ```
 
 #### Delete version or prefix
+Just delete directory from repo and run `ttyhstore collect` to exclude it from all lists.
 
-Just delete directory with it and run `ttyhstore collect` for exclude it from all lists.
-
-You may also remove all asserts and libraries, that aren't required by any client
-```
-ttyhstore cleanup
+You may also remove all asserts and libraries, that aren't required by any client:
+```bash
+    ttyhstore cleanup
 ```
 
 #### More
-
 See `ttyhstore help`.
