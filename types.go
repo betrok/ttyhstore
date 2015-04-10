@@ -46,6 +46,7 @@ func newVInfoFull() *VInfoFull {
 
 type LibInfo struct {
 	Name	string				`json:"name"`
+	Url		string				`jsob:"url"`
 	Natives	map[string] string	`json:"natives"`
 	Rules	[]Rule				`json:"rules"`
 }

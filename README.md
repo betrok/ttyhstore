@@ -12,7 +12,7 @@ Data store model mostly follows official(see [wiki.vg](http://wiki.vg/Game_Files
 Relative to storage root:
 *   **/prefixes.json**
     
-    Contains list of prefixes generated from **/&lt;prefix>/prefix.json**. If prefix have type *"hidden"*, it will not append hire.
+    Contains list of prefixes generated from **/&lt;prefix>/prefix.json**. If prefix have type *"hidden"*, it will not append here.
     ```
     {
         "prefixes": {
@@ -39,7 +39,7 @@ Relative to storage root:
     
     If this file is not presented defaults are `{"about" = "", "type" = "public"}`.
     
-    Optional *"latest"* files overwrite latest versions in versions.json manually. Default chaise based on releaseTime in /&lt;version>.json 
+    Optional *"latest"* files overwrite latest versions in versions.json manually. Default choise based on releaseTime in /&lt;version>.json 
     
 *   **/&lt;prefix>/versions/versions.json**
 

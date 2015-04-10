@@ -374,7 +374,11 @@ func checkCli(vers_root string) (vinfo *VInfoFull, err error) {
 func checkLibs(libInfo []*LibInfo) (index FIndex, err error) {
 	log.Println("Checking libs...")
 	path_list := make([]string, 0, 10)
+	index = make(FIndex)
+	
 	for _, lib := range(libInfo) {
+		path_list = path_list[:0]
+		
 		part := strings.Split(lib.Name, ":")
 		if(len(part) != 3) { return nil, fmt.Errorf("Unknown lib name format \"%s\"", lib.Name) }
 		part[0] = strings.Replace(part[0], ".", "/", -1)
@@ -413,22 +417,25 @@ func checkLibs(libInfo []*LibInfo) (index FIndex, err error) {
 				}
 			}
 		}
-	}
-	
-	index = make(FIndex)
-	for _, path := range(path_list) {
-		info, ok := checked.libs[filepath.Base(path)]
-		if(ok) {
-			if(verbose) {
-				log.Printf("Lib \"%s\" already checked\n", filepath.Base(path))
+		
+		for _, path := range(path_list) {
+			info, ok := checked.libs[filepath.Base(path)]
+			if(ok) {
+				if(verbose) {
+					log.Printf("Lib \"%s\" already checked\n", filepath.Base(path))
+				}
+			} else {
+				base_url := url["libs"];
+				if(len(lib.Url) > 0) {
+					base_url = lib.Url
+				}
+				if info, err = getLib(path, base_url); err != nil {
+					return index, err
+				}
+				checked.libs[filepath.Base(path)] = info
 			}
-		} else {
-			if info, err = getLib(path); err != nil {
-				return index, err
-			}
-			checked.libs[filepath.Base(path)] = info
+			index[path] = info
 		}
-		index[path] = info
 	}
 	return index, nil
 }
@@ -460,14 +467,14 @@ func genNeeders(rules []Rule) []string {
 	return ns
 }
 
-func getLib(path string) (obj FInfo, err error) {
+func getLib(path, base_url string) (obj FInfo, err error) {
 	full_path := store_root + "libraries/" + path
 	obj.Hash, err = readHashfile(full_path + ".sha1")
 	if(err != nil) {
 		if(!os.IsNotExist(err)) {
 			log.Printf("While reading hash file for \"%s\": %v", filepath.Base(path), err)
 		}
-		_, err = getFile(url["libs"] + path + ".sha1", full_path + ".sha1")
+		_, err = getFile(base_url + path + ".sha1", full_path + ".sha1")
 		if(err != nil) { return }
 		obj.Hash, err = readHashfile(full_path + ".sha1")
 		if(err != nil) { return }
@@ -487,12 +494,12 @@ func getLib(path string) (obj FInfo, err error) {
 	
 	if(!os.IsNotExist(err)) { log.Printf("%v. Regetting...", err) }
 	
-	_, err = getFile(url["libs"] + path + ".sha1", full_path + ".sha1")
+	_, err = getFile(base_url + path + ".sha1", full_path + ".sha1")
 	if(err != nil) { return }
 	obj.Hash, err = readHashfile(full_path + ".sha1")
 	if(err != nil) { return }
 	
-	_, err = getFile(url["libs"] + path, full_path)
+	_, err = getFile(base_url + path, full_path)
 	if(err != nil) { return }
 	
 	err = checkHash(full_path, obj.Hash)
