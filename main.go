@@ -786,17 +786,18 @@ func getFile(url, dest_path string) (int64, error) {
 	if err := os.MkdirAll(filepath.Dir(dest_path), os.ModeDir|0755); err != nil {
 		return 0, err
 	}
+	
+	start := time.Now()
 	resp, err := http.Get(url)
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
+	
 	if resp.StatusCode != 200 {
 		return 0, fmt.Errorf("Loading file \"%s\" failed with status \"%s\"", url, resp.Status)
 	}
 	log.Printf("%s (%s)", resp.Status, readableSize(float64(resp.ContentLength)))
-	start := time.Now()
-
 	fd, err := os.Create(dest_path)
 	if err != nil {
 		return 0, err
@@ -808,7 +809,7 @@ func getFile(url, dest_path string) (int64, error) {
 		return 0, err
 	}
 
-	delta := time.Now().Sub(start)
+	delta := time.Now().Sub(start) + 1
 	log.Printf("Done in %v, %s/s", delta, readableSize(float64(size)*float64(time.Second)/float64(delta)))
 	return size, err
 }
