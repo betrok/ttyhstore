@@ -589,7 +589,11 @@ func collectCustoms(vers_root string) (cust *Customs, err error) {
 			return fmt.Errorf("While walking over files: %v", err)
 		}
 		if !info.IsDir() {
-			cust.Index[strings.TrimPrefix(path, root)], err = getFInfo(path)
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return fmt.Errorf("Failed to determine relative path: %v", err)
+			}
+			cust.Index[rel], err = getFInfo(path)
 		}
 		return err
 	})
