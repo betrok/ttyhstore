@@ -20,26 +20,27 @@ import (
 )
 
 var (
-	store_root   string
-	special_dirs = []string{"libraries", "assets"}
+	storeRoot   string
+	specialDirs = []string{"libraries", "assets"}
 
-	url = map[string]string{
-		"versions": "http://s3.amazonaws.com/Minecraft.Download/versions/",
-
-		"libs":    "https://libraries.minecraft.net/",
-		"indexes": "https://s3.amazonaws.com/Minecraft.Download/indexes/",
-		"assets":  "http://resources.download.minecraft.net/",
+	url = struct {
+		Versions, Manifest, Libraries, Indexes, Assets string
+	}{
+		Manifest:  "https://launchermeta.mojang.com/mc/game/version_manifest.json",
+		Libraries: "https://libraries.minecraft.net/",
+		Indexes:   "https://s3.amazonaws.com/Minecraft.Download/indexes/",
+		Assets:    "http://resources.download.minecraft.net/",
 	}
 
-	os_list   = []string{"linux", "windows", "osx" /*, "MS-DOS"*/}
-	arch_list = []string{ /*"3.14", "8", "16",*/ "32", "64" /*, "128"*/}
+	osList   = []string{"linux", "windows", "osx" /*, "MS-DOS"*/}
+	archList = []string{ /*"3.14", "8", "16",*/ "32", "64" /*, "128"*/}
 
-	custom_last = map[string]string{}
-	ignore_list = map[string]bool{}
+	customLast = map[string]string{}
+	ignoreList = map[string]bool{}
 
-	clone, prefix string
+	prefix string
 
-	verbose, cleanup bool
+	verbose, cleanup, replace bool
 
 	checked = struct {
 		libs            map[string]FInfo
@@ -75,10 +76,10 @@ func main() {
 			var err error
 			switch strings.Count(cli, "/") {
 			case 0:
-				_, err = checkCli(store_root + prefix + "/" + cli + "/")
+				_, err = checkCli(storeRoot+prefix+"/"+cli+"/", false)
 
 			case 1:
-				_, err = checkCli(store_root + cli + "/")
+				_, err = checkCli(storeRoot+cli+"/", false)
 
 			default:
 				log.Fatalf("Too many slashes in \"%s\"", cli)
@@ -92,7 +93,7 @@ func main() {
 	case "clone":
 		log.Printf("Clone to prefix \"%s\"", prefix)
 		for _, cli := range args {
-			if err := cloneCli(store_root+prefix+"/", cli); err != nil {
+			if err := cloneCli(storeRoot+prefix+"/", cli); err != nil {
 				log.Fatalf("Clone version \"%s\" failed: %v", cli, err)
 			}
 		}
@@ -103,7 +104,7 @@ func main() {
 }
 
 func configure() (action string, args []string) {
-	store_root = os.Getenv("TTYH_STORE")
+	storeRoot = os.Getenv("TTYH_STORE")
 
 	var last, ignore string
 	var help bool
@@ -111,16 +112,17 @@ func configure() (action string, args []string) {
 	flag.BoolVar(&help, "help", false, "generated help sucks, overwrite it")
 	flag.BoolVar(&verbose, "v", false, "")
 	flag.BoolVar(&cleanup, "cleanup", false, "")
-	flag.StringVar(&store_root, "root", store_root, "")
+	flag.BoolVar(&replace, "replace", false, "")
+	flag.StringVar(&storeRoot, "root", storeRoot, "")
 	flag.StringVar(&last, "last", "", "")
 	flag.StringVar(&ignore, "ignore", "", "")
 	flag.StringVar(&prefix, "prefix", "default", "")
 
-	flag.Usage = func() { log.Printf(help_msg, os.Args[0]) }
+	flag.Usage = func() { log.Printf(helpMessage, os.Args[0]) }
 	flag.Parse()
 
-	if len(store_root) == 0 {
-		log.Println("Srote root not defined.\n")
+	if len(storeRoot) == 0 {
+		log.Println("Srote root not defined.")
 		help = true
 	}
 
@@ -128,17 +130,12 @@ func configure() (action string, args []string) {
 		return "help", flag.Args()
 	}
 
-	if inSlice(prefix, special_dirs) || len(prefix) == 0 {
+	if inSlice(prefix, specialDirs) || len(prefix) == 0 {
 		log.Fatal("Passed prefix belongs to special directories")
 	}
 
-	for name, link := range url {
-		if link[len(link)-1] != '/' {
-			url[name] = link + "/"
-		}
-	}
-	if store_root[len(store_root)-1] != '/' {
-		store_root += "/"
+	if storeRoot[len(storeRoot)-1] != '/' {
+		storeRoot += "/"
 	}
 
 	if len(last) != 0 {
@@ -148,13 +145,13 @@ func configure() (action string, args []string) {
 				log.Printf("Invalid --last format in \"%s\"", t)
 				return "help", nil
 			}
-			custom_last[part[0]] = part[1]
+			customLast[part[0]] = part[1]
 		}
 	}
 
 	if len(ignore) != 0 {
 		for _, item := range strings.Split(ignore, ",") {
-			ignore_list[item] = true
+			ignoreList[item] = true
 		}
 	}
 
@@ -165,35 +162,57 @@ func configure() (action string, args []string) {
 	return args[0], args[1:]
 }
 
-func cloneCli(prefix_root, cli string) error {
-	_, err := getFile(url["versions"]+cli+"/"+cli+".jar",
-		prefix_root+cli+"/"+cli+".jar")
+func cloneCli(prefixRoot, cli string) error {
+	manifestPath := storeRoot + "version_manifest.json"
+	err := getFile(&Download{URL: url.Manifest}, manifestPath)
 	if err != nil {
 		return err
 	}
 
-	_, err = getFile(url["versions"]+cli+"/"+cli+".json",
-		prefix_root+cli+"/"+cli+".json")
+	fd, err := os.Open(manifestPath)
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+
+	var manifest VersionManifest
+	err = json.NewDecoder(fd).Decode(&manifest)
+	if err != nil {
+		return fmt.Errorf("failed to decode version manifest: %v", err)
+	}
+
+	var version VInfoMin
+	for _, t := range manifest.Versions {
+		if t.Id == cli {
+			version = t
+			break
+		}
+	}
+	if version.Id == "" {
+		return fmt.Errorf("requseted version not found in manifest")
+	}
+
+	err = getFile(&Download{URL: version.URL}, prefixRoot+cli+"/"+cli+".json")
 	if err != nil {
 		return err
 	}
 
-	_, err = checkCli(prefix_root + cli + "/")
+	_, err = checkCli(prefixRoot+cli+"/", true)
 	return err
 }
 
 func collectAll() {
-	dir, err := ioutil.ReadDir(store_root)
+	dir, err := ioutil.ReadDir(storeRoot)
 	if err != nil {
-		log.Fatal("Can't read store_root directory", err)
+		log.Fatal("Can't read storeRoot directory", err)
 	}
-	plist := newPrefixList()
+	plist := NewPrefixList()
 	for _, fi := range dir {
-		if !fi.IsDir() || inSlice(fi.Name(), special_dirs) {
+		if !fi.IsDir() || inSlice(fi.Name(), specialDirs) || strings.HasPrefix(fi.Name(), ".") {
 			continue
 		}
 
-		pinfo := collectPrefix(store_root + fi.Name() + "/")
+		pinfo := collectPrefix(storeRoot + fi.Name() + "/")
 		if pinfo.Type != "hidden" {
 			plist.Prefixes[fi.Name()] = pinfo
 		}
@@ -203,63 +222,66 @@ func collectAll() {
 	log.Println("Generated prefixes.json:")
 	log.Println(string(data))
 
-	fd, err := os.Create(store_root + "prefixes.json")
+	fd, err := os.Create(storeRoot + "prefixes.json")
 	if err != nil {
-		log.Fatal("Create prefixes.json failed:", err)
+		log.Fatalf("Failed to create prefixes.json: %v", err)
 	}
-	fd.Write(data)
+	_, err = fd.Write(data)
+	if err != nil {
+		log.Fatalf("Failed to write prefixes.json: %v", err)
+	}
 	fd.Close()
 }
 
-func collectPrefix(prefix_root string) PrefixInfo {
+func collectPrefix(prefixRoot string) PrefixInfo {
 	var err error
-	prefix := filepath.Base(prefix_root)
+	name := filepath.Base(prefixRoot)
 
-	log.Printf("\nJoining prefix \"%s\"\n\n", prefix)
+	log.Printf("\nJoining prefix \"%s\"\n\n", name)
 
-	if err := os.MkdirAll(prefix_root+"versions", os.ModeDir|0755); err != nil {
+	if err := os.MkdirAll(prefixRoot+"versions", os.ModeDir|0755); err != nil {
 		log.Fatal(err)
 	}
 
-	var pinfo PrefixInfoExt
+	var pInfo PrefixInfoExt
 	var fd *os.File
-	if fd, err = os.Open(prefix_root + "prefix.json"); err == nil {
+	if fd, err = os.Open(prefixRoot + "prefix.json"); err == nil {
 		decoder := json.NewDecoder(fd)
-		err = decoder.Decode(&pinfo)
+		err = decoder.Decode(&pInfo)
 		fd.Close()
 	}
 	if err != nil {
 		log.Println("W: prefix.json read failed, use generic info\n")
-		pinfo.Type = "public"
+		pInfo.Type = "public"
 	} else {
-		for t, v := range pinfo.Latest {
-			full_type := prefix + "/" + t
-			if _, ok := custom_last[full_type]; !ok {
-				custom_last[full_type] = v
+		for t, v := range pInfo.Latest {
+			fullType := name + "/" + t
+			if _, ok := customLast[fullType]; !ok {
+				customLast[fullType] = v
 			}
 		}
 	}
 
-	new_vers := newVersions()
+	prefix := NewPrefix()
 
-	dir, err := ioutil.ReadDir(prefix_root)
+	dir, err := ioutil.ReadDir(prefixRoot)
 	if err != nil {
 		log.Fatal("Can't read prefix root directory", err)
 	}
 
 	for _, fi := range dir {
 		if !fi.IsDir() || fi.Name() == "versions" ||
-			ignore_list[prefix+"/"+fi.Name()] {
+			ignoreList[name+"/"+fi.Name()] {
 			continue
 		}
 
-		vinfo, err := checkCli(prefix_root + fi.Name() + "/")
+		vInfo, err := checkCli(prefixRoot+fi.Name()+"/", false)
 		if err == nil {
-			new_vers.Versions = append(new_vers.Versions, &vinfo.VInfoMin)
-			lt, ok := new_vers.latestTime[vinfo.Type]
-			if !ok || lt.Before(vinfo.Release) {
-				new_vers.Latest[vinfo.Type] = vinfo.Id
-				new_vers.latestTime[vinfo.Type] = vinfo.Release
+			prefix.Versions = append(prefix.Versions, &vInfo.VInfoMin)
+			lt, ok := prefix.latestTime[vInfo.Type]
+			if !ok || lt.Before(vInfo.Release) {
+				prefix.Latest[vInfo.Type] = vInfo.Id
+				prefix.latestTime[vInfo.Type] = vInfo.Release
 			}
 		} else {
 			invalids = true
@@ -267,106 +289,107 @@ func collectPrefix(prefix_root string) PrefixInfo {
 		}
 		log.Println()
 	}
-	sort.Sort(VersSlice(new_vers.Versions))
-	for t := range new_vers.Latest {
-		custom, ok := custom_last[prefix+"/"+t]
+
+	sort.Sort(VersionSlice(prefix.Versions))
+
+	for t := range prefix.Latest {
+		custom, ok := customLast[name+"/"+t]
 		if ok {
 			valid := false
-			for _, vers := range new_vers.Versions {
-				if vers.Id == custom {
-					if vers.Type != t {
+			for _, version := range prefix.Versions {
+				if version.Id == custom {
+					if version.Type != t {
 						log.Fatalf("In custom latest: mismatched client types for \"%s\"",
-							prefix+"/"+t)
+							name+"/"+t)
 					}
 					valid = true
 					break
 				}
 			}
 			if !valid {
-				log.Fatalf("Custom latest for \"%s\" isn't consistent cli", prefix+"/"+t)
+				log.Fatalf("Custom latest for \"%s\" isn't consistent cli", name+"/"+t)
 			}
 
-			new_vers.Latest[t] = custom
+			prefix.Latest[t] = custom
 		}
 	}
 
-	data, _ := json.MarshalIndent(new_vers, "", "  ")
+	data, _ := json.MarshalIndent(prefix, "", "  ")
 	log.Println("Generated version.json:")
 	log.Println(string(data))
 
-	fd, err = os.Create(prefix_root + "versions/versions.json")
+	fd, err = os.Create(prefixRoot + "versions/versions.json")
 	if err != nil {
 		log.Fatal("Create versions.json failed:", err)
 	}
 	fd.Write(data)
 	fd.Close()
-	log.Printf("\nDone in prefix \"%s\"\n\n", prefix)
+	log.Printf("\nDone in prefix \"%s\"\n\n", name)
 
-	return pinfo.PrefixInfo
+	return pInfo.PrefixInfo
 }
 
-func checkCli(vers_root string) (vinfo *VInfoFull, err error) {
-	version := filepath.Base(vers_root)
-	vinfo = newVInfoFull()
+func checkCli(versionRoot string, downloadJar bool) (*VInfoFull, error) {
+	version := filepath.Base(versionRoot)
+
 	log.Printf("Checking cli \"%s\"...\n", version)
-	var fd *os.File
-	if fd, err = os.Open(vers_root + version + ".json"); err == nil {
-		decoder := json.NewDecoder(fd)
-		err = decoder.Decode(vinfo)
+
+	var (
+		fd   *os.File
+		err  error
+		info VInfoFull
+	)
+	if fd, err = os.Open(versionRoot + version + ".json"); err == nil {
+		err = json.NewDecoder(fd).Decode(&info)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %v.json: %v", version+".json")
+		}
 		fd.Close()
 	}
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	if len(vinfo.Arguments) == 0 || len(vinfo.MainClass) == 0 {
-		err = fmt.Errorf("Arguments or mainClass aren't defined")
-		return
+	if info.Id != version {
+		return nil, fmt.Errorf("mismatched dir name & client id: \"%s\" != \"%s\"\n", version, info.Id)
 	}
 
-	if vinfo.Id != version {
-		fmt.Printf("W: Mismatched dir name & client id: \"%s\" != \"%s\"\n", version, vinfo.Id)
-	}
 	log.Printf("%v.json: OK", version)
 
 	var files FilesInfo
 
-	files.Main, err = getFInfo(vers_root + version + ".jar")
-	if err != nil {
-		return
+	jarPath := versionRoot + version + ".jar"
+	jarInfo := &info.Downloads.Client
+
+	if downloadJar {
+		err = getFile(jarInfo, jarPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	switch len(vinfo.JarHash) {
-	case 0:
-		if vinfo.JarSize != 0 && vinfo.JarSize != files.Main.Size {
-			return nil, fmt.Errorf(".jar file size mismatched with defined")
-		}
+	files.Main, err = getFInfo(jarPath)
+	if err != nil {
+		return nil, err
+	}
 
-	case 40:
-		if vinfo.JarHash != files.Main.Hash {
-			return nil, fmt.Errorf(".jar file hash mismatched with defined")
-		}
-
-	default:
-		return nil, fmt.Errorf("Invalid hash \"%s\" provided for .jar file", vinfo.JarHash)
+	if !jarInfo.Match(files.Main) {
+		return nil, fmt.Errorf("%s does not match expectations", version+".jar")
 	}
 
 	log.Printf("%v.jar: OK", version)
 
-	if len(vinfo.Assets) != 0 {
-		err = checkAssets(vinfo.Assets)
+	if len(info.Assets) != 0 {
+		err = checkAssets(info.Assets, &info.AssetIndex)
 		if err != nil {
-			return
+			return nil, err
 		}
 		log.Println("Assets: OK")
 	} else {
 		log.Printf("W: No assets defined for \"%s\"\n", version)
 	}
-	if err != nil {
-		return
-	}
 
-	files.Files, err = collectCustoms(vers_root)
+	files.Files, err = collectCustoms(versionRoot)
 	switch {
 	case err == nil:
 		log.Println("Files: OK")
@@ -375,113 +398,190 @@ func checkCli(vers_root string) (vinfo *VInfoFull, err error) {
 		log.Println("Files aren't present")
 
 	default:
-		return
+		return nil, err
 	}
 
-	files.Libs, err = checkLibs(vinfo.Libs)
+	files.Libs, err = checkLibs(info.Libs)
 	if err != nil {
-		return
+		return nil, err
 	}
+
+	log.Println("Libraries: OK")
 
 	data, _ := json.MarshalIndent(files, "", "  ")
-	fd, err = os.Create(vers_root + "data.json")
+	fd, err = os.Create(versionRoot + "data.json")
 	if err != nil {
-		log.Fatal("Create index file data.json failed:", err)
+		log.Fatalf("failed to create data.json: %v", err)
 	}
-	fd.Write(data)
+	_, err = fd.Write(data)
+	if err != nil {
+		log.Fatalf("failed to write to data.json: %v", err)
+	}
 	fd.Close()
-	log.Println("Libs: OK")
 
 	log.Printf("Cli \"%s\" seems to be suitable", version)
-	return
+	return &info, nil
 }
 
-func checkLibs(libInfo []*LibInfo) (index FIndex, err error) {
+func checkLibs(libInfo []LibInfo) (FIndex, error) {
 	log.Println("Checking libs...")
-	path_list := make([]string, 0, 10)
-	index = make(FIndex)
+	index := make(FIndex)
 
 	for _, lib := range libInfo {
-		path_list = path_list[:0]
-
-		part := strings.Split(lib.Name, ":")
-		if len(part) != 3 {
-			return nil, fmt.Errorf("Unknown lib name format \"%s\"", lib.Name)
-		}
-		part[0] = strings.Replace(part[0], ".", "/", -1)
-
-		if lib.Natives == nil {
-			path_list = append(path_list,
-				fmt.Sprintf("%s/%s/%s/%s-%s.jar", part[0], part[1], part[2], part[1], part[2]))
+		if lib.Downloads != nil {
+			if lib.Downloads.Artifact != (LibDownload{}) {
+				err := checkLib(&lib.Downloads.Artifact, index)
+				if err != nil {
+					return nil, err
+				}
+			}
+			for _, class := range lib.Downloads.Classifiers {
+				err := checkLib(&class, index)
+				if err != nil {
+					return nil, err
+				}
+			}
 		} else {
-			sub_dir := fmt.Sprintf("%s/%s/%s", part[0], part[1], part[2])
-
-			var needers []string
-			if lib.Rules != nil {
-				needers = genNeeders(lib.Rules)
-			} else {
-				needers = os_list
+			err := checkLibOld(&lib, index)
+			if err != nil {
+				return nil, err
 			}
-
-			for os, suffix := range lib.Natives {
-				//unknown or disallowed os
-				if !inSlice(os, needers) {
-					if !inSlice(os, os_list) {
-						log.Printf("W: Unknown os \"%s\" in natives", os)
-					}
-					continue
-				}
-
-				if strings.Contains(suffix, "${arch}") {
-					for _, arch := range arch_list {
-						path_list = append(path_list,
-							fmt.Sprintf("%s/%s-%s-%s.jar", sub_dir, part[1], part[2],
-								strings.Replace(suffix, "${arch}", arch, -1)))
-					}
-				} else {
-					path_list = append(path_list,
-						fmt.Sprintf("%s/%s-%s-%s.jar", sub_dir, part[1], part[2], suffix))
-				}
-			}
-		}
-
-		for _, path := range path_list {
-			info, ok := checked.libs[filepath.Base(path)]
-			if ok {
-				if verbose {
-					log.Printf("Lib \"%s\" already checked\n", filepath.Base(path))
-				}
-			} else {
-				base_url := url["libs"]
-				if len(lib.Url) > 0 {
-					base_url = lib.Url
-				}
-				if info, err = getLib(path, base_url); err != nil {
-					return index, err
-				}
-				checked.libs[filepath.Base(path)] = info
-			}
-			index[path] = info
 		}
 	}
 	return index, nil
 }
 
+func checkLib(dl *LibDownload, index FIndex) error {
+	if info, ok := checked.libs[dl.Path]; ok {
+		if !dl.Match(info) {
+			return fmt.Errorf("lib %v was already checked but has different expectations now", dl.Path)
+		}
+		if verbose {
+			log.Printf("Lib \"%s\" already checked\n", dl.Path)
+		}
+		index[dl.Path] = info
+		return nil
+	}
+
+	fullPath := storeRoot + "libraries/" + dl.Path
+
+	info, err := getFInfo(fullPath)
+	switch {
+	case err == nil:
+
+		switch {
+		case dl.Match(info):
+			dl.SHA1 = info.Hash
+			dl.Size = info.Size
+
+		case replace:
+			err = getFile(&dl.Download, storeRoot+"libraries/"+dl.Path)
+			if err != nil {
+				return err
+			}
+
+		default:
+			return fmt.Errorf("existing lib %v does not match expectations", dl.Path)
+		}
+
+	case os.IsNotExist(err):
+		err = getFile(&dl.Download, storeRoot+"libraries/"+dl.Path)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return err
+	}
+
+	index[dl.Path] = dl.ToFInfo()
+	checked.libs[dl.Path] = dl.ToFInfo()
+
+	return nil
+}
+
+func checkLibOld(lib *LibInfo, index FIndex) error {
+	pathList := make([]string, 0, 10)
+
+	part := strings.Split(lib.Name, ":")
+	if len(part) != 3 {
+		return fmt.Errorf("unknown lib name format \"%s\"", lib.Name)
+	}
+	part[0] = strings.Replace(part[0], ".", "/", -1)
+
+	if lib.Natives == nil {
+		pathList = append(pathList,
+			fmt.Sprintf("%s/%s/%s/%s-%s.jar", part[0], part[1], part[2], part[1], part[2]))
+	} else {
+		subDir := fmt.Sprintf("%s/%s/%s", part[0], part[1], part[2])
+
+		var needers []string
+		if lib.Rules != nil {
+			needers = genNeeders(lib.Rules)
+		} else {
+			needers = osList
+		}
+
+		for os, suffix := range lib.Natives {
+			//unknown or disallowed os
+			if !inSlice(os, needers) {
+				if !inSlice(os, osList) {
+					log.Printf("W: Unknown os \"%s\" in natives", os)
+				}
+				continue
+			}
+
+			if strings.Contains(suffix, "${arch}") {
+				for _, arch := range archList {
+					pathList = append(pathList,
+						fmt.Sprintf("%s/%s-%s-%s.jar", subDir, part[1], part[2],
+							strings.Replace(suffix, "${arch}", arch, -1)))
+				}
+			} else {
+				pathList = append(pathList,
+					fmt.Sprintf("%s/%s-%s-%s.jar", subDir, part[1], part[2], suffix))
+			}
+		}
+	}
+
+	for _, path := range pathList {
+		info, ok := checked.libs[path]
+		if ok {
+			if verbose {
+				log.Printf("Lib \"%s\" already checked\n", filepath.Base(path))
+			}
+		} else {
+			baseURL := url.Libraries
+			if len(lib.Url) > 0 {
+				baseURL = lib.Url
+			}
+			info, err := getLibOld(path, baseURL)
+			if err != nil {
+				return err
+			}
+			checked.libs[path] = info
+		}
+		index[path] = info
+	}
+
+	return nil
+}
+
 func genNeeders(rules []Rule) []string {
-	ns := make([]string, 0, len(os_list))
+	ns := make([]string, 0, len(osList))
 	for _, rule := range rules {
 		switch {
-		case rule.Os == nil && rule.Action == "allow":
-			ns = ns[0:len(os_list)]
-			copy(ns, os_list)
+		case rule.Os == OsRule{} && rule.Action == "allow":
+			ns = ns[0:len(osList)]
+			copy(ns, osList)
 
 		case rule.Action == "allow":
-			ns = append(ns, rule.Os["name"])
+			ns = append(ns, rule.Os.Name)
 
 		case rule.Action == "disallow":
-			if _, ok := rule.Os["version"]; !ok {
+			if rule.Os.Version == "" && rule.Os.Arch == "" {
 				for i, os := range ns {
-					if os == rule.Os["name"] {
+					if os == rule.Os.Name {
 						ns[i], ns = ns[len(ns)-1], ns[:len(ns)-1]
 					}
 				}
@@ -494,18 +594,20 @@ func genNeeders(rules []Rule) []string {
 	return ns
 }
 
-func getLib(path, base_url string) (obj FInfo, err error) {
-	full_path := store_root + "libraries/" + path
-	obj.Hash, err = readHashfile(full_path + ".sha1")
+func getLibOld(path, baseUrl string) (obj FInfo, err error) {
+	fullPath := storeRoot + "libraries/" + path
+	obj.Hash, err = readHashFile(fullPath + ".sha1")
 	if err != nil {
 		if !os.IsNotExist(err) {
 			log.Printf("While reading hash file for \"%s\": %v", filepath.Base(path), err)
 		}
-		_, err = getFile(base_url+path+".sha1", full_path+".sha1")
+		err = getFile(&Download{
+			URL: baseUrl + path + ".sha1",
+		}, fullPath+".sha1")
 		if err != nil {
 			return
 		}
-		obj.Hash, err = readHashfile(full_path + ".sha1")
+		obj.Hash, err = readHashFile(fullPath + ".sha1")
 		if err != nil {
 			return
 		}
@@ -513,12 +615,12 @@ func getLib(path, base_url string) (obj FInfo, err error) {
 		log.Printf("Hash file for lib \"%s\" already exist\n", filepath.Base(path))
 	}
 
-	err = checkHash(full_path, obj.Hash)
+	err = checkHash(fullPath, obj.Hash)
 	if err == nil {
 		if verbose {
 			log.Printf("Lib \"%s\" already exist\n", filepath.Base(path))
 		}
-		fi, _ := os.Stat(full_path)
+		fi, _ := os.Stat(fullPath)
 		obj.Size = fi.Size()
 		return
 	}
@@ -527,29 +629,30 @@ func getLib(path, base_url string) (obj FInfo, err error) {
 		log.Printf("%v. Regetting...", err)
 	}
 
-	_, err = getFile(base_url+path+".sha1", full_path+".sha1")
+	err = getFile(&Download{
+		URL: baseUrl + path + ".sha1",
+	}, fullPath+".sha1")
 	if err != nil {
 		return
 	}
-	obj.Hash, err = readHashfile(full_path + ".sha1")
+	obj.Hash, err = readHashFile(fullPath + ".sha1")
 	if err != nil {
 		return
 	}
 
-	_, err = getFile(base_url+path, full_path)
+	dl := Download{
+		URL:  baseUrl + path,
+		SHA1: obj.Hash,
+	}
+	err = getFile(&dl, fullPath)
 	if err != nil {
 		return
 	}
 
-	err = checkHash(full_path, obj.Hash)
-	if err == nil {
-		fi, _ := os.Stat(full_path)
-		obj.Size = fi.Size()
-	}
-	return
+	return dl.ToFInfo(), nil
 }
 
-func readHashfile(full_path string) (string, error) {
+func readHashFile(full_path string) (string, error) {
 	fd, err := os.Open(full_path)
 	if err != nil {
 		return "", err
@@ -567,7 +670,7 @@ func parseIndex(path string) (*ObjectList, error) {
 		return nil, err
 	}
 
-	list := newObjectList()
+	list := NewObjectList()
 	decoder := json.NewDecoder(fd)
 	err = decoder.Decode(list)
 
@@ -578,7 +681,7 @@ func parseIndex(path string) (*ObjectList, error) {
 func collectCustoms(vers_root string) (cust *Customs, err error) {
 	log.Printf("Collecting files for \"%s\"...\n", filepath.Base(vers_root))
 
-	cust = newCustoms()
+	cust = NewCustoms()
 
 	root := vers_root + "files/"
 	if _, err := os.Stat(root); err != nil {
@@ -629,38 +732,50 @@ func collectCustoms(vers_root string) (cust *Customs, err error) {
 	return cust, nil
 }
 
-func checkAssets(version string) (err error) {
-	log.Printf("Checking assets \"%s\"...\n", version)
+func checkAssets(id string, dl *AssetDownload) (err error) {
+	log.Printf("Checking assets \"%s\"...\n", id)
 
-	if checked.indexes[version+".json"] {
+	version := id
+	key := version + ".json"
+	path := storeRoot + "assets/indexes/" + version + ".json"
+	if dl.SHA1 != "" {
+		key = dl.SHA1
+		path = storeRoot + "assets/indexes/" + dl.SHA1 + "/" + version + ".json"
+	}
+
+	if checked.indexes[key] {
 		if verbose {
-			log.Printf("Index \"%s\" already checked\n", version+".json")
+			log.Printf("Index \"%s\" already checked\n", key)
 		}
 		return nil
 	}
 
-	if err = os.MkdirAll(store_root+"assets/indexes/", os.ModeDir|0755); err != nil {
-		return
+	if err = os.MkdirAll(storeRoot+"assets/indexes/", os.ModeDir|0755); err != nil {
+		return err
 	}
-	if err = os.MkdirAll(store_root+"assets/objects/", os.ModeDir|0755); err != nil {
-		return
+	if err = os.MkdirAll(storeRoot+"assets/objects/", os.ModeDir|0755); err != nil {
+		return err
 	}
 
-	list, err := parseIndex(store_root + "assets/indexes/" + version + ".json")
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Printf("W: Assets index \"%s\" not found, downloading official version", version)
-			_, err = getFile(url["indexes"]+version+".json", store_root+"assets/indexes/"+version+".json")
-			if err != nil {
-				return
-			}
-			list, err = parseIndex(store_root + "assets/indexes/" + version + ".json")
-			if err != nil {
-				return
-			}
-		} else {
-			return
+	list, err := parseIndex(path)
+	switch {
+	case err == nil:
+
+	case os.IsNotExist(err):
+		if dl.URL == "" {
+			dl.URL = url.Indexes + version + ".json"
 		}
+		err = getFile(&dl.Download, path)
+		if err != nil {
+			return err
+		}
+		list, err = parseIndex(path)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return err
 	}
 
 	for name, a := range list.Data {
@@ -672,10 +787,12 @@ func checkAssets(version string) (err error) {
 		}
 
 		if len(a.Hash) != 40 || a.Size <= 0 {
-			return fmt.Errorf("Assets \"%s\"(%s) size or hash defined incorrect", name, a.Hash)
+			return fmt.Errorf("asset \"%s\"(%s) size or hash defined incorrect", name, a.Hash)
 		}
-		local_path := a.Hash[:2] + "/" + a.Hash
-		err := checkHash(store_root+"assets/objects/"+local_path, a.Hash)
+
+		localPath := a.Hash[:2] + "/" + a.Hash
+
+		err := checkHash(storeRoot+"assets/objects/"+localPath, a.Hash)
 		switch {
 		case err == nil:
 			if verbose {
@@ -693,12 +810,11 @@ func checkAssets(version string) (err error) {
 			log.Printf("%v. Regetting", err)
 		}
 
-		_, err = getFile(url["assets"]+local_path, store_root+"assets/objects/"+local_path)
-		if err != nil {
-			return err
-		}
-
-		err = checkHash(store_root+"assets/objects/"+local_path, a.Hash)
+		err = getFile(&Download{
+			SHA1: a.Hash,
+			Size: a.Size,
+			URL:  url.Assets + localPath,
+		}, storeRoot+"assets/objects/"+localPath)
 		if err != nil {
 			return err
 		}
@@ -706,14 +822,14 @@ func checkAssets(version string) (err error) {
 		checked.assets[a.Hash] = true
 	}
 
-	checked.indexes[version+".json"] = true
+	checked.indexes[key] = true
 	return
 }
 
 func clean() {
 	log.Println("Cleaning up...\n")
-	indexes_root := store_root + "assets/indexes/"
-	dir, err := ioutil.ReadDir(indexes_root)
+	indexesRoot := storeRoot + "assets/indexes/"
+	dir, err := ioutil.ReadDir(indexesRoot)
 	if err != nil {
 		log.Fatal("Can't read assets indexes directory", err)
 	}
@@ -721,7 +837,7 @@ func clean() {
 		if fi.IsDir() || checked.indexes[fi.Name()] {
 			continue
 		}
-		err = os.Remove(indexes_root + fi.Name())
+		err = os.Remove(indexesRoot + fi.Name())
 		if err != nil {
 			log.Fatal("Cleanup failed:", err)
 		}
@@ -730,8 +846,8 @@ func clean() {
 		}
 	}
 
-	libs_root := store_root + "libraries/"
-	filepath.Walk(libs_root, func(path string, info os.FileInfo, err error) error {
+	libsRoot := storeRoot + "libraries/"
+	filepath.Walk(libsRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil && !os.IsNotExist(err) {
 			log.Println("While walking over libraries:", err)
 		}
@@ -739,7 +855,8 @@ func clean() {
 			rmEmptyDirs(path)
 			return nil
 		} else {
-			_, ok := checked.libs[strings.TrimSuffix(filepath.Base(path), ".sha1")]
+			key := strings.TrimPrefix(strings.TrimSuffix(path, ".sha1"), libsRoot)
+			_, ok := checked.libs[key]
 			if !ok {
 				err = os.Remove(path)
 				if err != nil && !os.IsNotExist(err) {
@@ -753,7 +870,7 @@ func clean() {
 		return nil
 	})
 
-	filepath.Walk(store_root+"assets/objects/", func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(storeRoot+"assets/objects/", func(path string, info os.FileInfo, err error) error {
 		if err != nil && !os.IsNotExist(err) {
 			log.Println("While walking over libraries:", err)
 		}
@@ -785,37 +902,71 @@ func rmEmptyDirs(path string) (err error) {
 	return err
 }
 
-func getFile(url, dest_path string) (int64, error) {
-	log.Printf("Getting file \"%s\"...", filepath.Base(dest_path))
-	if err := os.MkdirAll(filepath.Dir(dest_path), os.ModeDir|0755); err != nil {
-		return 0, err
+func getFile(dl *Download, destPath string) error {
+	name := filepath.Base(destPath)
+
+	var (
+		expectedHash []byte
+		err          error
+	)
+	if dl.SHA1 != "" {
+		expectedHash, err = hex.DecodeString(dl.SHA1)
+		if err != nil || len(expectedHash) != 20 {
+			return fmt.Errorf("invalid hash \"%s\" provided for \"%s\"", dl.SHA1, name)
+		}
 	}
-	
+
+	log.Printf("Getting file \"%s\"...", filepath.Base(destPath))
+
+	if err := os.MkdirAll(filepath.Dir(destPath), os.ModeDir|0755); err != nil {
+		return err
+	}
+
 	start := time.Now()
-	resp, err := http.Get(url)
+	resp, err := http.Get(dl.URL)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != 200 {
-		return 0, fmt.Errorf("Loading file \"%s\" failed with status \"%s\"", url, resp.Status)
+		return fmt.Errorf("loading \"%s\" failed with status \"%s\"", dl.URL, resp.Status)
 	}
+
 	log.Printf("%s (%s)", resp.Status, readableSize(float64(resp.ContentLength)))
-	fd, err := os.Create(dest_path)
+
+	if resp.ContentLength != -1 && dl.Size != 0 && resp.ContentLength != dl.Size {
+		return fmt.Errorf("size of file \"%s\" does not match expectations", name)
+	}
+
+	fd, err := os.Create(destPath)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	defer fd.Close()
 
-	size, err := io.Copy(fd, resp.Body)
+	sha := sha1.New()
+	out := io.MultiWriter(fd, sha)
+
+	size, err := io.Copy(out, resp.Body)
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	delta := time.Now().Sub(start) + 1
 	log.Printf("Done in %v, %s/s", delta, readableSize(float64(size)*float64(time.Second)/float64(delta)))
-	return size, err
+
+	if dl.Size != 0 && dl.Size != size {
+		return fmt.Errorf("size of file \"%s\" does not match expectations", name)
+	}
+	hash := sha.Sum(nil)
+	if dl.SHA1 != "" && !bytes.Equal(hash, expectedHash) {
+		return fmt.Errorf("hash of file \"%s\" does not match expectations", name)
+	}
+
+	dl.Size = size
+	dl.SHA1 = hex.EncodeToString(hash)
+	return nil
 }
 
 func readableSize(in float64) string {
@@ -834,7 +985,7 @@ func readableSize(in float64) string {
 func checkHash(path, hash string) error {
 	dhash, err := hex.DecodeString(hash)
 	if err != nil || len(dhash) != 20 {
-		return fmt.Errorf("Invalid hash \"%s\" provided for \"%s\"", hash, filepath.Base(path))
+		return fmt.Errorf("invalid hash \"%s\" provided for \"%s\"", hash, filepath.Base(path))
 	}
 	fhash, err := fileHash(path)
 	if err != nil {
@@ -843,7 +994,7 @@ func checkHash(path, hash string) error {
 	if bytes.Equal(dhash, fhash) {
 		return nil
 	}
-	return fmt.Errorf("Hash sums mismatched for \"%s\":\ndefined:\t %s \ncalicated:\t %s",
+	return fmt.Errorf("hash sums mismatched for \"%s\":\ndefined:\t %s \ncalicated:\t %s",
 		filepath.Base(path), hash, hex.EncodeToString(fhash))
 
 }
