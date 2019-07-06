@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -35,8 +36,9 @@ var (
 	osList   = []string{"linux", "windows", "osx" /*, "MS-DOS"*/}
 	archList = []string{ /*"3.14", "8", "16",*/ "32", "64" /*, "128"*/}
 
-	customLast = map[string]string{}
-	ignoreList = map[string]bool{}
+	customLast   = map[string]string{}
+	ignoreList   = map[string]bool{}
+	libOverwrite []*regexp.Regexp
 
 	prefix string
 
@@ -155,11 +157,45 @@ func configure() (action string, args []string) {
 		}
 	}
 
+	err := readLibOverwrite()
+	if err != nil {
+		log.Fatalf("failed to prerare lib owerwrite: %v", err)
+	}
+
 	args = flag.Args()
 	if len(args) == 0 {
 		return "collect", args
 	}
 	return args[0], args[1:]
+}
+
+func readLibOverwrite() error {
+	fd, err := os.Open(storeRoot + "libraries/overwrite.list")
+	switch {
+	case err == nil:
+
+	case os.IsNotExist(err):
+		// whatever
+		return nil
+
+	default:
+		return err
+	}
+
+	defer fd.Close()
+
+	sc := bufio.NewScanner(fd)
+	for sc.Scan() {
+		if sc.Text() == "" {
+			continue
+		}
+		r, err := regexp.Compile(sc.Text())
+		if err != nil {
+			return fmt.Errorf("%v : %v", sc.Text(), err)
+		}
+		libOverwrite = append(libOverwrite, r)
+	}
+	return sc.Err()
 }
 
 func cloneCli(prefixRoot, cli string) error {
@@ -451,9 +487,25 @@ func checkLibs(libInfo []LibInfo) (FIndex, error) {
 	return index, nil
 }
 
+func checkLibOverwrite(path string) bool {
+	for _, r := range libOverwrite {
+		if r.MatchString(path) {
+			return true
+		}
+	}
+	return false
+}
+
 func checkLib(dl *LibDownload, index FIndex) error {
 	if info, ok := checked.libs[dl.Path]; ok {
 		if !dl.Match(info) {
+			if checkLibOverwrite(dl.Path) {
+				if verbose {
+					log.Printf("Lib \"%s\" already checked\n", dl.Path)
+				}
+				return nil
+			}
+
 			return fmt.Errorf("lib %v was already checked but has different expectations now", dl.Path)
 		}
 		if verbose {
@@ -470,7 +522,7 @@ func checkLib(dl *LibDownload, index FIndex) error {
 	case err == nil:
 
 		switch {
-		case dl.Match(info):
+		case dl.Match(info) || checkLibOverwrite(dl.Path):
 			dl.SHA1 = info.Hash
 			dl.Size = info.Size
 
