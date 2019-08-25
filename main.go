@@ -503,6 +503,7 @@ func checkLib(dl *LibDownload, index FIndex) error {
 				if verbose {
 					log.Printf("Lib \"%s\" already checked\n", dl.Path)
 				}
+				index[dl.Path] = dl.ToFInfo()
 				return nil
 			}
 
