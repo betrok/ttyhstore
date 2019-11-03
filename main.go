@@ -52,6 +52,8 @@ var (
 	invalids bool
 )
 
+const overwriteFile = "overwrite.list"
+
 func main() {
 	log.SetFlags(0)
 	log.SetOutput(os.Stdout)
@@ -170,7 +172,7 @@ func configure() (action string, args []string) {
 }
 
 func readLibOverwrite() error {
-	fd, err := os.Open(storeRoot + "libraries/overwrite.list")
+	fd, err := os.Open(storeRoot + "libraries/" + overwriteFile)
 	switch {
 	case err == nil:
 
@@ -266,7 +268,10 @@ func collectAll() {
 	if err != nil {
 		log.Fatalf("Failed to write prefixes.json: %v", err)
 	}
-	fd.Close()
+	err = fd.Close()
+	if err != nil {
+		log.Fatalf("Failed to write prefixes.json: %v", err)
+	}
 }
 
 func collectPrefix(prefixRoot string) PrefixInfo {
@@ -284,18 +289,17 @@ func collectPrefix(prefixRoot string) PrefixInfo {
 	if fd, err = os.Open(prefixRoot + "prefix.json"); err == nil {
 		decoder := json.NewDecoder(fd)
 		err = decoder.Decode(&pInfo)
-		fd.Close()
-	}
-	if err != nil {
-		log.Println("W: prefix.json read failed, use generic info\n")
-		pInfo.Type = "public"
-	} else {
+		_ = fd.Close()
+
 		for t, v := range pInfo.Latest {
 			fullType := name + "/" + t
 			if _, ok := customLast[fullType]; !ok {
 				customLast[fullType] = v
 			}
 		}
+	} else {
+		log.Println("W: prefix.json read failed, use generic info\n")
+		pInfo.Type = "public"
 	}
 
 	prefix := NewPrefix()
@@ -358,8 +362,14 @@ func collectPrefix(prefixRoot string) PrefixInfo {
 	if err != nil {
 		log.Fatal("Create versions.json failed:", err)
 	}
-	fd.Write(data)
-	fd.Close()
+	_, err = fd.Write(data)
+	if err != nil {
+		log.Fatal("Create versions.json failed:", err)
+	}
+	err = fd.Close()
+	if err != nil {
+		log.Fatal("Create versions.json failed:", err)
+	}
 	log.Printf("\nDone in prefix \"%s\"\n\n", name)
 
 	return pInfo.PrefixInfo
@@ -380,7 +390,7 @@ func checkCli(versionRoot string, downloadJar bool) (*VInfoFull, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse %v.json: %v", version+".json")
 		}
-		fd.Close()
+		_ = fd.Close()
 	}
 	if err != nil {
 		return nil, err
@@ -453,7 +463,7 @@ func checkCli(versionRoot string, downloadJar bool) (*VInfoFull, error) {
 	if err != nil {
 		log.Fatalf("failed to write to data.json: %v", err)
 	}
-	fd.Close()
+	_ = fd.Close()
 
 	log.Printf("Cli \"%s\" seems to be suitable", version)
 	return &info, nil
@@ -727,7 +737,7 @@ func parseIndex(path string) (*ObjectList, error) {
 	decoder := json.NewDecoder(fd)
 	err = decoder.Decode(list)
 
-	fd.Close()
+	_ = fd.Close()
 	return list, err
 }
 
@@ -771,7 +781,7 @@ func collectCustoms(vers_root string) (cust *Customs, err error) {
 				log.Printf("W: File \"%s\" from mutables.list isn't present in /files/", path)
 			}
 		}
-		fd.Close()
+		_ = fd.Close()
 
 		if err = scanner.Err(); err != nil {
 			return nil, fmt.Errorf("Reading mutables.list failed:", err)
@@ -900,7 +910,7 @@ func clean() {
 	}
 
 	libsRoot := storeRoot + "libraries/"
-	filepath.Walk(libsRoot, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(libsRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil && !os.IsNotExist(err) {
 			log.Println("While walking over libraries:", err)
 		}
@@ -908,9 +918,10 @@ func clean() {
 			rmEmptyDirs(path)
 			return nil
 		} else {
+			log.Println(path)
 			key := strings.TrimPrefix(strings.TrimSuffix(path, ".sha1"), libsRoot)
 			_, ok := checked.libs[key]
-			if !ok {
+			if !ok && key != overwriteFile {
 				err = os.Remove(path)
 				if err != nil && !os.IsNotExist(err) {
 					log.Fatal("Fatal:", err)
@@ -923,7 +934,7 @@ func clean() {
 		return nil
 	})
 
-	filepath.Walk(storeRoot+"assets/objects/", func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(storeRoot+"assets/objects/", func(path string, info os.FileInfo, err error) error {
 		if err != nil && !os.IsNotExist(err) {
 			log.Println("While walking over libraries:", err)
 		}
@@ -1076,8 +1087,8 @@ func fileHash(path string) ([]byte, error) {
 	defer fd.Close()
 
 	h := sha1.New()
-	io.Copy(h, fd)
-	return h.Sum(nil), nil
+	_, err = io.Copy(h, fd)
+	return h.Sum(nil), err
 }
 
 func inSlice(val string, sli []string) bool {
