@@ -30,7 +30,7 @@ var (
 		Manifest:  "https://launchermeta.mojang.com/mc/game/version_manifest.json",
 		Libraries: "https://libraries.minecraft.net/",
 		Indexes:   "https://s3.amazonaws.com/Minecraft.Download/indexes/",
-		Assets:    "http://resources.download.minecraft.net/",
+		Assets:    "https://resources.download.minecraft.net/",
 	}
 
 	osList   = []string{"linux", "windows", "osx" /*, "MS-DOS"*/}
